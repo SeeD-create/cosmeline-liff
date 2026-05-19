@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>サロン登録 | cosmeline</title>
+<style>
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
+    background: #f7f3ee; color: #5b5048; margin: 0;
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+  }
+  .card { text-align: center; padding: 36px 28px; max-width: 320px; }
+  .spinner {
+    width: 38px; height: 38px; margin: 0 auto 22px;
+    border: 3px solid #e6dccc; border-top-color: #b89a6e; border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  h1 { font-size: 18px; margin: 0 0 10px; font-weight: 600; }
+  p { font-size: 14px; line-height: 1.75; margin: 4px 0; color: #7b7068; }
+  .ok { color: #6f9160; }
+  .err { color: #c0685e; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="spinner" id="spinner"></div>
+  <h1 id="title">登録処理中…</h1>
+  <p id="msg">そのまま少々お待ちください</p>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
+  var LIFF_ID = "2010126538-NtCg1KGT";
+  var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
+  // ▲▲▲ 設定ここまで ▲▲▲
+
+  function show(title, msg, cls) {
+    document.getElementById('spinner').style.display = 'none';
+    var t = document.getElementById('title');
+    t.textContent = title;
+    t.className = cls || '';
+    document.getElementById('msg').textContent = msg;
+  }
+
+  // QRに付けた ?salon=Sxxx を取得（LIFFが liff.state に退避する場合も拾う）
+  function getSalonId() {
+    var q = new URLSearchParams(window.location.search);
+    var direct = q.get('salon');
+    if (direct) return direct;
+    var state = q.get('liff.state');
+    if (state) {
+      var m = decodeURIComponent(state).match(/salon=([^&]+)/);
+      if (m) return decodeURIComponent(m[1]);
+    }
+    return '';
+  }
+
+  async function main() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+
+      // ログイン未済（外部ブラウザ等）はLINEログインへ
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+
+      var salonId = getSalonId();
+      if (!salonId) {
+        show('エラー', 'サロン情報が読み取れませんでした。店頭のQRコードをもう一度読み取ってください。', 'err');
+        return;
+      }
+
+      var idToken = liff.getIDToken();
+      if (!idToken) {
+        show('エラー', 'ログイン情報を取得できませんでした。LINEアプリから開き直してください。', 'err');
+        return;
+      }
+
+      // ブラウザ→GASのCORSプリフィルトを避けるため text/plain + no-cors で送信。
+      // no-cors のため応答は読めない。確定確認は友だち追加後のあいさつで担保する。
+      await fetch(GAS_ENDPOINT + '?path=liff-register', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({ idToken: idToken, salonId: salonId }),
+      });
+
+      show('ご登録ありがとうございます', 'LINEのトーク画面に戻ります🌿', 'ok');
+      setTimeout(function () {
+        if (liff.isInClient()) liff.closeWindow();
+      }, 1800);
+    } catch (err) {
+      show('エラー', '通信に失敗しました。電波の良い場所で、QRコードをもう一度読み取ってください。', 'err');
+    }
+  }
+
+  main();
+</script>
+</body>
+</html>
