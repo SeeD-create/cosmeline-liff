@@ -35,7 +35,10 @@
   // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
   var LIFF_ID = "2010126538-NtCg1KGT";
   var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
+  var BOT_BASIC_ID = "@388xmgxk"; // 友だち追加URL用
   // ▲▲▲ 設定ここまで ▲▲▲
+
+  var SALON_STORAGE_KEY = 'cosmeline_pending_salon';
 
   function show(title, msg, cls) {
     document.getElementById('spinner').style.display = 'none';
@@ -55,42 +58,25 @@
       var m = decodeURIComponent(state).match(/salon=([^&]+)/);
       if (m) return decodeURIComponent(m[1]);
     }
+    try {
+      var stored = localStorage.getItem(SALON_STORAGE_KEY);
+      if (stored) return stored;
+    } catch (e) {}
     return '';
   }
 
-  // ▼▼▼ 診断モード（一時）：友だち追加プロンプトが出ない問題の切り分け用
-  // 通常モードに戻すときは、この main() を削除して下の // ORIGINAL main() を有効化する
-  async function main() {
-    try {
-      await liff.init({ liffId: LIFF_ID });
-      if (!liff.isLoggedIn()) { liff.login(); return; }
-
-      var fs = { friendFlag: 'N/A' };
-      try { fs = await liff.getFriendship(); } catch (e) { fs = { friendFlag: 'ERR: ' + (e && e.message) }; }
-
-      var info = [
-        'isInClient: ' + liff.isInClient(),
-        'isLoggedIn: ' + liff.isLoggedIn(),
-        'friendFlag: ' + fs.friendFlag,
-        'salonId: ' + getSalonId(),
-        'os: ' + liff.getOS(),
-        'lineVer: ' + liff.getLineVersion(),
-        'liffSdk: ' + (liff.getVersion ? liff.getVersion() : 'N/A'),
-      ].join('\n');
-      // 改行を可視化するため p ではなく pre で表示
-      document.getElementById('spinner').style.display = 'none';
-      document.getElementById('title').textContent = '診断モード';
-      var msg = document.getElementById('msg');
-      msg.style.whiteSpace = 'pre-line';
-      msg.style.textAlign = 'left';
-      msg.textContent = info;
-    } catch (err) {
-      show('エラー', String((err && err.message) || err), 'err');
-    }
+  function rememberSalon(salonId) {
+    try { localStorage.setItem(SALON_STORAGE_KEY, salonId); } catch (e) {}
   }
-  // ▲▲▲ 診断モードここまで
+  function forgetSalon() {
+    try { localStorage.removeItem(SALON_STORAGE_KEY); } catch (e) {}
+  }
 
-  /* ORIGINAL main() — 診断完了後にこちらに戻す
+  function redirectToFriendAdd() {
+    var basic = BOT_BASIC_ID.charAt(0) === '@' ? BOT_BASIC_ID.slice(1) : BOT_BASIC_ID;
+    window.location.href = 'https://line.me/R/ti/p/@' + basic;
+  }
+
   async function main() {
     try {
       await liff.init({ liffId: LIFF_ID });
@@ -101,6 +87,16 @@
       var salonId = getSalonId();
       if (!salonId) {
         show('エラー', 'サロン情報が読み取れませんでした。店頭のQRコードをもう一度読み取ってください。', 'err');
+        return;
+      }
+      rememberSalon(salonId);
+
+      // 友だち未追加なら、友だち追加画面へ自動遷移
+      var fs = null;
+      try { fs = await liff.getFriendship(); } catch (e) { fs = null; }
+      if (fs && fs.friendFlag === false) {
+        show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
+        setTimeout(redirectToFriendAdd, 600);
         return;
       }
 
@@ -117,6 +113,7 @@
         body: JSON.stringify({ idToken: idToken, salonId: salonId }),
       });
 
+      forgetSalon();
       show('ご登録ありがとうございます', 'LINEのトーク画面に戻ります🌿', 'ok');
       setTimeout(function () {
         if (liff.isInClient()) liff.closeWindow();
@@ -125,7 +122,6 @@
       show('エラー', '通信に失敗しました。電波の良い場所で、QRコードをもう一度読み取ってください。', 'err');
     }
   }
-  */
 
   main();
 </script>
