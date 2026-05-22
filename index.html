@@ -89,16 +89,6 @@
         show('エラー', 'サロン情報が読み取れませんでした。店頭のQRコードをもう一度読み取ってください。', 'err');
         return;
       }
-      rememberSalon(salonId);
-
-      // 友だち未追加なら、友だち追加画面へ自動遷移
-      var fs = null;
-      try { fs = await liff.getFriendship(); } catch (e) { fs = null; }
-      if (fs && fs.friendFlag === false) {
-        show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
-        setTimeout(redirectToFriendAdd, 600);
-        return;
-      }
 
       var idToken = liff.getIDToken();
       if (!idToken) {
@@ -106,12 +96,23 @@
         return;
       }
 
+      // サロン紐づけを先にGASへ送る（友だち未追加でもidTokenからuserIdが取れる）
       fetch(GAS_ENDPOINT + '?path=liff-register', {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({ idToken: idToken, salonId: salonId }),
       });
+
+      // 友だち未追加なら友追画面へ。追加済みならトークに戻すだけ
+      var fs = null;
+      try { fs = await liff.getFriendship(); } catch (e) { fs = null; }
+      if (fs && fs.friendFlag === false) {
+        forgetSalon();
+        show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
+        setTimeout(redirectToFriendAdd, 600);
+        return;
+      }
 
       forgetSalon();
       show('ご登録ありがとうございます', 'LINEのトーク画面に戻ります🌿', 'ok');
