@@ -104,21 +104,11 @@
         body: JSON.stringify({ idToken: idToken, salonId: salonId }),
       });
 
-      // 友だち未追加なら友追画面へ。追加済みならトークに戻すだけ
-      var fs = null;
-      try { fs = await liff.getFriendship(); } catch (e) { fs = null; }
-      if (fs && fs.friendFlag === false) {
-        forgetSalon();
-        show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
-        setTimeout(redirectToFriendAdd, 600);
-        return;
-      }
-
+      // 友だち追加画面へ無条件に遷移
+      // 既に友達ならLINE側がそのままチャット画面に連れていくので無害
       forgetSalon();
-      show('ご登録ありがとうございます', 'LINEのトーク画面に戻ります🌿', 'ok');
-      setTimeout(function () {
-        if (liff.isInClient()) liff.closeWindow();
-      }, 1800);
+      show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
+      setTimeout(redirectToFriendAdd, 600);
     } catch (err) {
       show('エラー', '通信に失敗しました。電波の良い場所で、QRコードをもう一度読み取ってください。', 'err');
     }
