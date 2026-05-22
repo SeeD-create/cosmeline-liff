@@ -79,7 +79,9 @@
 
       // ブラウザ→GASのCORSプリフィルトを避けるため text/plain + no-cors で送信。
       // no-cors のため応答は読めない。確定確認は友だち追加後のあいさつで担保する。
-      await fetch(GAS_ENDPOINT + '?path=liff-register', {
+      // fire-and-forget：GASのcold startを待たず即UI更新。送信中にcloseWindowが走らないよう
+      // setTimeoutの間（1800ms）にリクエストが投げ切られる前提。
+      fetch(GAS_ENDPOINT + '?path=liff-register', {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
