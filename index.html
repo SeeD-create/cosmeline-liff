@@ -58,6 +58,39 @@
     return '';
   }
 
+  // ▼▼▼ 診断モード（一時）：友だち追加プロンプトが出ない問題の切り分け用
+  // 通常モードに戻すときは、この main() を削除して下の // ORIGINAL main() を有効化する
+  async function main() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) { liff.login(); return; }
+
+      var fs = { friendFlag: 'N/A' };
+      try { fs = await liff.getFriendship(); } catch (e) { fs = { friendFlag: 'ERR: ' + (e && e.message) }; }
+
+      var info = [
+        'isInClient: ' + liff.isInClient(),
+        'isLoggedIn: ' + liff.isLoggedIn(),
+        'friendFlag: ' + fs.friendFlag,
+        'salonId: ' + getSalonId(),
+        'os: ' + liff.getOS(),
+        'lineVer: ' + liff.getLineVersion(),
+        'liffSdk: ' + (liff.getVersion ? liff.getVersion() : 'N/A'),
+      ].join('\n');
+      // 改行を可視化するため p ではなく pre で表示
+      document.getElementById('spinner').style.display = 'none';
+      document.getElementById('title').textContent = '診断モード';
+      var msg = document.getElementById('msg');
+      msg.style.whiteSpace = 'pre-line';
+      msg.style.textAlign = 'left';
+      msg.textContent = info;
+    } catch (err) {
+      show('エラー', String((err && err.message) || err), 'err');
+    }
+  }
+  // ▲▲▲ 診断モードここまで
+
+  /* ORIGINAL main() — 診断完了後にこちらに戻す
   async function main() {
     try {
       await liff.init({ liffId: LIFF_ID });
@@ -77,10 +110,6 @@
         return;
       }
 
-      // ブラウザ→GASのCORSプリフィルトを避けるため text/plain + no-cors で送信。
-      // no-cors のため応答は読めない。確定確認は友だち追加後のあいさつで担保する。
-      // fire-and-forget：GASのcold startを待たず即UI更新。送信中にcloseWindowが走らないよう
-      // setTimeoutの間（1800ms）にリクエストが投げ切られる前提。
       fetch(GAS_ENDPOINT + '?path=liff-register', {
         method: 'POST',
         mode: 'no-cors',
@@ -96,6 +125,7 @@
       show('エラー', '通信に失敗しました。電波の良い場所で、QRコードをもう一度読み取ってください。', 'err');
     }
   }
+  */
 
   main();
 </script>
