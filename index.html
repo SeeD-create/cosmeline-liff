@@ -3,31 +3,230 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>サロン登録 | cosmeline</title>
+<title>植物美容AIナビ | K LAB. BOTANICAL THERAPY</title>
 <style>
+  :root {
+    --bg: #f7f3ee;
+    --ink: #5b5048;
+    --sub: #7b7068;
+    --accent: #b89a6e;
+    --line: #e6dccc;
+    --ok: #6f9160;
+    --err: #c0685e;
+  }
+  * { box-sizing: border-box; }
   body {
     font-family: -apple-system, "Hiragino Sans", "Yu Gothic", sans-serif;
-    background: #f7f3ee; color: #5b5048; margin: 0;
+    background: var(--bg); color: var(--ink); margin: 0;
+    line-height: 1.7;
+  }
+
+  /* ===== 既存：サロン紐づけ / 完了画面の中央寄せカード ===== */
+  .center-stage {
     display: flex; align-items: center; justify-content: center; min-height: 100vh;
   }
   .card { text-align: center; padding: 36px 28px; max-width: 320px; }
   .spinner {
     width: 38px; height: 38px; margin: 0 auto 22px;
-    border: 3px solid #e6dccc; border-top-color: #b89a6e; border-radius: 50%;
+    border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%;
     animation: spin 0.9s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
-  h1 { font-size: 18px; margin: 0 0 10px; font-weight: 600; }
-  p { font-size: 14px; line-height: 1.75; margin: 4px 0; color: #7b7068; }
-  .ok { color: #6f9160; }
-  .err { color: #c0685e; }
+  .card h1 { font-size: 18px; margin: 0 0 10px; font-weight: 600; }
+  .card p { font-size: 14px; line-height: 1.75; margin: 4px 0; color: var(--sub); }
+  .card .ok { color: var(--ok); }
+  .card .err { color: var(--err); }
+
+  /* ===== 植物美容ナビ：フォーム ===== */
+  .navi { max-width: 520px; margin: 0 auto; padding: 28px 20px 96px; }
+  .navi-hero {
+    text-align: center; padding: 8px 4px 22px; border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+  }
+  .navi-brand {
+    letter-spacing: 0.18em; font-size: 11px; color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .navi-title { font-size: 20px; font-weight: 600; margin: 0; }
+  .navi-sub { font-size: 12px; color: var(--sub); margin: 6px 0 0; }
+
+  .qblock { padding: 18px 0 4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .qhead {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+  }
+  .qnum {
+    font-size: 11px; color: #fff; background: var(--accent);
+    padding: 2px 8px; border-radius: 10px; letter-spacing: 0.05em;
+  }
+  .qtitle { font-size: 15px; font-weight: 600; margin: 0; }
+  .qhint { font-size: 11px; color: var(--sub); margin: 0 0 10px 38px; }
+
+  .opts { display: grid; gap: 8px; }
+  .opt {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 14px; border: 1px solid var(--line); border-radius: 10px;
+    cursor: pointer; user-select: none; background: #fff;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 14px;
+  }
+  .opt input { margin: 0; accent-color: var(--accent); }
+  .opt.checked { border-color: var(--accent); background: #fbf7ef; }
+
+  .photo-zone {
+    border: 1.5px dashed var(--line); border-radius: 12px;
+    padding: 22px 16px; text-align: center; background: #fff; cursor: pointer;
+  }
+  .photo-zone.has-photo { border-style: solid; border-color: var(--accent); }
+  .photo-zone .pz-hint { font-size: 12px; color: var(--sub); margin-top: 6px; }
+  .photo-zone img { max-width: 200px; max-height: 200px; border-radius: 8px; margin: 8px 0 4px; }
+  #photoInput { display: none; }
+
+  .submit-bar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: rgba(247,243,238,0.95);
+    backdrop-filter: blur(6px);
+    padding: 14px 20px;
+    border-top: 1px solid var(--line);
+  }
+  .submit-btn {
+    display: block; width: 100%; max-width: 480px; margin: 0 auto;
+    padding: 14px; font-size: 15px; font-weight: 600;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    cursor: pointer;
+  }
+  .submit-btn:disabled { background: #c7baa3; cursor: not-allowed; }
+
+  .alert {
+    background: #faf2ee; border: 1px solid #f2d6cd; color: var(--err);
+    padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px;
+  }
+
+  .navi-disclaimer {
+    margin-top: 18px; font-size: 11px; color: var(--sub); text-align: center;
+  }
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="spinner" id="spinner"></div>
-  <h1 id="title">登録処理中…</h1>
-  <p id="msg">そのまま少々お待ちください</p>
+
+<!-- ===== 既存：サロン紐づけ / 完了画面 / エラー画面 ===== -->
+<div id="stageCenter" class="center-stage" style="display:none">
+  <div class="card">
+    <div class="spinner" id="spinner"></div>
+    <h1 id="title">処理中…</h1>
+    <p id="msg">そのまま少々お待ちください</p>
+  </div>
+</div>
+
+<!-- ===== 新規：植物美容AIナビ フォーム ===== -->
+<div id="stageNavi" class="navi" style="display:none">
+  <div class="navi-hero">
+    <div class="navi-brand">K LAB. BOTANICAL THERAPY</div>
+    <h1 class="navi-title">植物美容AIナビ</h1>
+    <p class="navi-sub">海と森の植物療法から、<br>今のあなたに合う植物美容をご提案します</p>
+  </div>
+
+  <div id="alertBox"></div>
+
+  <!-- Q1 -->
+  <div class="qblock" data-q="q1_skin" data-type="multi" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q1</span>
+      <p class="qtitle">現在気になる肌状態は？</p>
+    </div>
+    <p class="qhint">複数選択できます</p>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="qblock" data-q="q2_impression" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q2</span>
+      <p class="qtitle">現在の肌印象に近いものは？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="qblock" data-q="q3_mood" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q3</span>
+      <p class="qtitle">今の気分に近いものは？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="qblock" data-q="q4_aroma" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q4</span>
+      <p class="qtitle">好きな香りイメージは？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q5 -->
+  <div class="qblock" data-q="q5_sleep" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q5</span>
+      <p class="qtitle">睡眠リズムについて</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q6 -->
+  <div class="qblock" data-q="q6_season" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q6</span>
+      <p class="qtitle">季節や環境で肌変化を感じますか？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q7 -->
+  <div class="qblock" data-q="q7_botanical" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q7</span>
+      <p class="qtitle">興味のある植物美容は？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- Q8 -->
+  <div class="qblock" data-q="q8_experience" data-type="single" data-required="true">
+    <div class="qhead">
+      <span class="qnum">Q8</span>
+      <p class="qtitle">どんな美容時間を過ごしたいですか？</p>
+    </div>
+    <div class="opts"></div>
+  </div>
+
+  <!-- 顔写真 -->
+  <div class="qblock" data-q="photo" data-required="true">
+    <div class="qhead">
+      <span class="qnum">📷</span>
+      <p class="qtitle">お肌の状態がよく分かるお写真</p>
+    </div>
+    <p class="qhint">自然光のもと、メイクは軽めだとご提案の精度が上がります</p>
+    <label class="photo-zone" id="photoZone" for="photoInput">
+      <div id="photoPlaceholder">
+        <div style="font-size: 28px;">📷</div>
+        <div style="margin-top: 6px;">タップして写真を選ぶ</div>
+        <div class="pz-hint">カメラ または カメラロール から</div>
+      </div>
+      <img id="photoPreview" style="display:none">
+      <div id="photoChangeHint" style="display:none; font-size: 12px; color: var(--sub);">タップして別の写真を選ぶ</div>
+    </label>
+    <input type="file" id="photoInput" accept="image/*" capture="user">
+  </div>
+
+  <p class="navi-disclaimer">
+    ※ 本サービスは医療診断ではありません。<br>
+    植物美容体験としてお楽しみください。
+  </p>
+</div>
+
+<div class="submit-bar" id="submitBar" style="display:none">
+  <button class="submit-btn" id="submitBtn" disabled>送信する（残り: 全項目）</button>
 </div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -35,34 +234,43 @@
   // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
   var LIFF_ID = "2010126538-NtCg1KGT";
   var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
-  var BOT_BASIC_ID = "@388xmgxk"; // 友だち追加URL用
+  var BOT_BASIC_ID = "@388xmgxk";
   // ▲▲▲ 設定ここまで ▲▲▲
 
   var SALON_STORAGE_KEY = 'cosmeline_pending_salon';
 
-  function show(title, msg, cls) {
-    document.getElementById('spinner').style.display = 'none';
+  // ===== モード判定 =====
+  function getQuery(key) {
+    var q = new URLSearchParams(window.location.search);
+    var v = q.get(key);
+    if (v) return v;
+    var state = q.get('liff.state');
+    if (state) {
+      var m = decodeURIComponent(state).match(new RegExp(key + '=([^&]+)'));
+      if (m) return decodeURIComponent(m[1]);
+    }
+    return '';
+  }
+
+  function detectMode() {
+    if (getQuery('mode') === 'navi') return 'navi';
+    if (getQuery('salon')) return 'salon';
+    try {
+      if (localStorage.getItem(SALON_STORAGE_KEY)) return 'salon';
+    } catch (_) {}
+    return 'salon'; // フォールバック（既存挙動）
+  }
+
+  // ===== サロン紐づけフロー（既存） =====
+  function showCenter(title, msg, cls) {
+    document.getElementById('stageCenter').style.display = 'flex';
+    document.getElementById('stageNavi').style.display = 'none';
+    document.getElementById('submitBar').style.display = 'none';
+    document.getElementById('spinner').style.display = (cls === 'err' || cls === 'ok') ? 'none' : '';
     var t = document.getElementById('title');
     t.textContent = title;
     t.className = cls || '';
-    document.getElementById('msg').textContent = msg;
-  }
-
-  // QRに付けた ?salon=Sxxx を取得（LIFFが liff.state に退避する場合も拾う）
-  function getSalonId() {
-    var q = new URLSearchParams(window.location.search);
-    var direct = q.get('salon');
-    if (direct) return direct;
-    var state = q.get('liff.state');
-    if (state) {
-      var m = decodeURIComponent(state).match(/salon=([^&]+)/);
-      if (m) return decodeURIComponent(m[1]);
-    }
-    try {
-      var stored = localStorage.getItem(SALON_STORAGE_KEY);
-      if (stored) return stored;
-    } catch (e) {}
-    return '';
+    document.getElementById('msg').innerHTML = msg;
   }
 
   function rememberSalon(salonId) {
@@ -71,46 +279,242 @@
   function forgetSalon() {
     try { localStorage.removeItem(SALON_STORAGE_KEY); } catch (e) {}
   }
-
   function redirectToFriendAdd() {
     var basic = BOT_BASIC_ID.charAt(0) === '@' ? BOT_BASIC_ID.slice(1) : BOT_BASIC_ID;
     window.location.href = 'https://line.me/R/ti/p/@' + basic;
   }
 
+  async function runSalonFlow() {
+    showCenter('登録処理中…', 'そのまま少々お待ちください', '');
+
+    var salonId = getQuery('salon');
+    if (!salonId) {
+      try { salonId = localStorage.getItem(SALON_STORAGE_KEY) || ''; } catch (_) {}
+    }
+    if (!salonId) {
+      showCenter('エラー', 'サロン情報が読み取れませんでした。<br>店頭のQRコードをもう一度読み取ってください。', 'err');
+      return;
+    }
+    rememberSalon(salonId);
+
+    var idToken = liff.getIDToken();
+    if (!idToken) {
+      showCenter('エラー', 'ログイン情報を取得できませんでした。<br>LINEアプリから開き直してください。', 'err');
+      return;
+    }
+
+    fetch(GAS_ENDPOINT + '?path=liff-register', {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify({ idToken: idToken, salonId: salonId }),
+    });
+
+    forgetSalon();
+    showCenter('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
+    setTimeout(redirectToFriendAdd, 600);
+  }
+
+  // ===== 植物美容ナビフロー =====
+  var NAVI_OPTIONS = {
+    q1_skin: ['乾燥', '水分不足', 'ごわつき', '毛穴', '皮脂', 'ハリ不足感', 'くすみ印象', '揺らぎやすい', '敏感傾向', '特になし'],
+    q2_impression: ['乾燥しやすい', 'ベタつきやすい', '季節で変わる', '揺らぎやすい', '比較的安定している'],
+    q3_mood: ['深呼吸したい', 'リラックスしたい', 'リフレッシュしたい', 'やさしく整えたい', '気分を切り替えたい', '前向きな気分になりたい'],
+    q4_aroma: ['フローラル', '柑橘', '森林', 'ハーブ', '深い落ち着き', 'やさしい香り'],
+    q5_sleep: ['よく眠れている', '浅いことがある', '不規則', '疲れを感じやすい'],
+    q6_season: ['春に揺らぎやすい', '夏にベタつきやすい', '秋冬に乾燥しやすい', '年中変化しやすい', 'あまり感じない'],
+    q7_botanical: ['発酵植物美容', '海藻美容', '和植物美容', '香り植物療法', 'ナチュラル美容', '更年期世代美容'],
+    q8_experience: ['癒されたい', '学びたい', '自分を整えたい', '香りを楽しみたい', '自分だけのコスメを作りたい'],
+  };
+
+  var naviAnswers = {
+    q1_skin: [],
+    q2_impression: '', q3_mood: '', q4_aroma: '', q5_sleep: '',
+    q6_season: '', q7_botanical: '', q8_experience: '',
+  };
+  var photoBase64 = '';
+  var photoMime = '';
+
+  function buildOptions() {
+    document.querySelectorAll('.qblock').forEach(function (block) {
+      var q = block.getAttribute('data-q');
+      var type = block.getAttribute('data-type');
+      if (!type) return; // 写真ブロックは別処理
+      var opts = NAVI_OPTIONS[q];
+      var optsContainer = block.querySelector('.opts');
+      if (!opts || !optsContainer) return;
+      opts.forEach(function (label) {
+        var inputType = (type === 'multi') ? 'checkbox' : 'radio';
+        var wrap = document.createElement('label');
+        wrap.className = 'opt';
+        wrap.innerHTML =
+          '<input type="' + inputType + '" name="' + q + '" value="' + label + '">' +
+          '<span>' + label + '</span>';
+        var input = wrap.querySelector('input');
+        input.addEventListener('change', function () {
+          if (type === 'multi') {
+            if (input.checked) {
+              if (naviAnswers[q].indexOf(label) < 0) naviAnswers[q].push(label);
+            } else {
+              naviAnswers[q] = naviAnswers[q].filter(function (v) { return v !== label; });
+            }
+            wrap.classList.toggle('checked', input.checked);
+          } else {
+            naviAnswers[q] = label;
+            optsContainer.querySelectorAll('.opt').forEach(function (el) {
+              el.classList.remove('checked');
+            });
+            wrap.classList.add('checked');
+          }
+          updateSubmitBtn();
+        });
+        optsContainer.appendChild(wrap);
+      });
+    });
+  }
+
+  function setupPhotoInput() {
+    var input = document.getElementById('photoInput');
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) return;
+      compressToBase64(file, function (base64, mime) {
+        photoBase64 = base64;
+        photoMime = mime;
+        var preview = document.getElementById('photoPreview');
+        preview.src = 'data:' + mime + ';base64,' + base64;
+        preview.style.display = 'inline-block';
+        document.getElementById('photoPlaceholder').style.display = 'none';
+        document.getElementById('photoChangeHint').style.display = 'block';
+        document.getElementById('photoZone').classList.add('has-photo');
+        updateSubmitBtn();
+      });
+    });
+  }
+
+  // 画像を最大1024pxにリサイズしてbase64化（GAS POSTサイズ抑制）
+  function compressToBase64(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1024;
+        var w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        var base64 = dataUrl.split(',')[1] || '';
+        cb(base64, 'image/jpeg');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function countUnanswered() {
+    var n = 0;
+    if (!naviAnswers.q1_skin || naviAnswers.q1_skin.length === 0) n++;
+    ['q2_impression', 'q3_mood', 'q4_aroma', 'q5_sleep', 'q6_season', 'q7_botanical', 'q8_experience'].forEach(function (k) {
+      if (!naviAnswers[k]) n++;
+    });
+    if (!photoBase64) n++;
+    return n;
+  }
+
+  function updateSubmitBtn() {
+    var btn = document.getElementById('submitBtn');
+    var remain = countUnanswered();
+    if (remain === 0) {
+      btn.disabled = false;
+      btn.textContent = '送信する';
+    } else {
+      btn.disabled = true;
+      btn.textContent = '送信する（残り ' + remain + ' 項目）';
+    }
+  }
+
+  function setNaviAlert(text) {
+    var box = document.getElementById('alertBox');
+    if (!text) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="alert">' + text + '</div>';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  async function submitNavi() {
+    if (countUnanswered() > 0) {
+      setNaviAlert('未回答の項目があります。すべてご回答ください🌿');
+      return;
+    }
+    var btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '送信中…';
+
+    var idToken = liff.getIDToken();
+    if (!idToken) {
+      setNaviAlert('ログイン情報が取得できませんでした。LINEアプリから開き直してください。');
+      btn.disabled = false;
+      btn.textContent = '送信する';
+      return;
+    }
+
+    var payload = {
+      idToken: idToken,
+      answers: naviAnswers,
+      photoBase64: photoBase64,
+      photoMime: photoMime,
+    };
+
+    // no-cors なのでレスポンスは取れないが、サーバ側で push で結果が届く
+    fetch(GAS_ENDPOINT + '?path=plant-navi-submit', {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+      body: JSON.stringify(payload),
+    });
+
+    // 完了画面に切替
+    showCenter(
+      'ご回答ありがとうございます🌿',
+      '結果はLINEのトークでお届けします。<br>このまま閉じてLINEにお戻りください。',
+      'ok'
+    );
+    setTimeout(function () {
+      try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {}
+    }, 2500);
+  }
+
+  function runNaviFlow() {
+    document.getElementById('stageCenter').style.display = 'none';
+    document.getElementById('stageNavi').style.display = 'block';
+    document.getElementById('submitBar').style.display = 'block';
+    buildOptions();
+    setupPhotoInput();
+    updateSubmitBtn();
+    document.getElementById('submitBtn').addEventListener('click', submitNavi);
+  }
+
+  // ===== エントリーポイント =====
   async function main() {
+    var mode = detectMode();
+    // 起動中は中央スピナーを既定で表示
+    showCenter('読み込み中…', 'そのまま少々お待ちください', '');
+
     try {
       await liff.init({ liffId: LIFF_ID });
-
-      // ログイン未済（外部ブラウザ等）はLINEログインへ
       if (!liff.isLoggedIn()) { liff.login(); return; }
 
-      var salonId = getSalonId();
-      if (!salonId) {
-        show('エラー', 'サロン情報が読み取れませんでした。店頭のQRコードをもう一度読み取ってください。', 'err');
-        return;
+      if (mode === 'navi') {
+        runNaviFlow();
+      } else {
+        await runSalonFlow();
       }
-
-      var idToken = liff.getIDToken();
-      if (!idToken) {
-        show('エラー', 'ログイン情報を取得できませんでした。LINEアプリから開き直してください。', 'err');
-        return;
-      }
-
-      // サロン紐づけを先にGASへ送る（友だち未追加でもidTokenからuserIdが取れる）
-      fetch(GAS_ENDPOINT + '?path=liff-register', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: JSON.stringify({ idToken: idToken, salonId: salonId }),
-      });
-
-      // 友だち追加画面へ無条件に遷移
-      // 既に友達ならLINE側がそのままチャット画面に連れていくので無害
-      forgetSalon();
-      show('LINE公式アカウントを追加してください', '自動で追加画面へ移動します…', '');
-      setTimeout(redirectToFriendAdd, 600);
     } catch (err) {
-      show('エラー', '通信に失敗しました。電波の良い場所で、QRコードをもう一度読み取ってください。', 'err');
+      showCenter('エラー', '通信に失敗しました。電波の良い場所で開き直してください。', 'err');
     }
   }
 
