@@ -353,6 +353,8 @@
     document.getElementById('stageCenter').style.display = 'flex';
     document.getElementById('stageNavi').style.display = 'none';
     document.getElementById('submitBar').style.display = 'none';
+    var mp = document.getElementById('stageMypage');
+    if (mp) mp.style.display = 'none';
     document.getElementById('spinner').style.display = (cls === 'err' || cls === 'ok') ? 'none' : '';
     var t = document.getElementById('title');
     t.textContent = title;
@@ -683,6 +685,20 @@
       var data = await fetchJsonp_(url);
       if (!data || !data.ok) {
         showCenter('エラー', 'マイページ情報を取得できませんでした。<br>もう一度開き直してください。', 'err');
+        return;
+      }
+      // 未同意ユーザーはマイページを表示せず、同意書へ誘導
+      if (!data.consented) {
+        showCenter(
+          'まず同意書のご確認を',
+          'マイページのご利用には同意書へのご同意が必要です。<br>'
+          + 'LINEのトーク画面に同意のご案内をお送りしました。<br>'
+          + 'トークに戻ってご確認ください🌿',
+          'ok'
+        );
+        setTimeout(function () {
+          try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {}
+        }, 3500);
         return;
       }
       renderMypage(data);
