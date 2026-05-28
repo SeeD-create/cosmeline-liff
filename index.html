@@ -104,6 +104,66 @@
   .navi-disclaimer {
     margin-top: 18px; font-size: 11px; color: var(--sub); text-align: center;
   }
+
+  /* ===== マイページ ===== */
+  .mypage { max-width: 520px; margin: 0 auto; padding: 24px 20px 60px; }
+  .mp-hero { text-align: center; padding: 8px 4px 18px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+  .mp-brand { letter-spacing: 0.18em; font-size: 11px; color: var(--accent); margin-bottom: 6px; }
+  .mp-title { font-size: 20px; font-weight: 600; margin: 0; }
+  .mp-greeting { font-size: 13px; color: var(--sub); margin: 6px 0 0; }
+
+  .profile-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 22px;
+  }
+  .profile-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 6px 0; border-bottom: 1px dashed var(--line);
+    font-size: 13px;
+  }
+  .profile-row:last-child { border-bottom: none; }
+  .profile-row .pl { color: var(--sub); }
+  .profile-row .pv { color: var(--ink); font-weight: 600; }
+
+  .section-head {
+    font-size: 13px; color: var(--sub); margin: 18px 0 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-head::before {
+    content: ''; width: 18px; height: 1px; background: var(--accent);
+  }
+
+  .history-card {
+    background: #fff; border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .history-date {
+    font-size: 11px; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 8px;
+  }
+  .history-row { font-size: 13px; line-height: 1.65; margin: 2px 0; }
+  .history-row .hl { color: var(--sub); font-size: 11px; margin-right: 6px; }
+  .history-empty {
+    text-align: center; color: var(--sub); font-size: 13px; padding: 22px 10px;
+    background: #fff; border: 1px dashed var(--line); border-radius: 10px;
+  }
+
+  .redo-cta {
+    margin: 26px 0 0; padding: 18px 16px; background: #fff;
+    border: 1px solid var(--line); border-radius: 12px; text-align: center;
+  }
+  .redo-cta p { font-size: 12px; color: var(--sub); margin: 6px 0 12px; }
+  .redo-btn {
+    display: inline-block; width: 100%; padding: 12px;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 600; text-decoration: none;
+    cursor: pointer;
+  }
+  .redo-btn.disabled {
+    background: #c7baa3; cursor: not-allowed; pointer-events: none;
+  }
+  .redo-next {
+    font-size: 12px; color: var(--accent); margin-top: 10px;
+  }
 </style>
 </head>
 <body>
@@ -229,6 +289,32 @@
   <button class="submit-btn" id="submitBtn" disabled>送信する（残り: 全項目）</button>
 </div>
 
+<!-- ===== マイページ ===== -->
+<div id="stageMypage" class="mypage" style="display:none">
+  <div class="mp-hero">
+    <div class="mp-brand">K LAB. BOTANICAL THERAPY</div>
+    <h1 class="mp-title">マイページ</h1>
+    <p class="mp-greeting" id="mpGreeting"></p>
+  </div>
+
+  <div class="profile-card" id="mpProfile"></div>
+
+  <div class="section-head">これまでの植物美容ナビ</div>
+  <div id="mpHistory"></div>
+
+  <div class="redo-cta">
+    <div style="font-weight:600; font-size:14px;">植物美容AIナビを受ける</div>
+    <p>月に1回、季節やお気持ちの変化に合わせて</p>
+    <a id="mpRedoBtn" class="redo-btn" href="#">再診断する</a>
+    <div class="redo-next" id="mpRedoNext"></div>
+  </div>
+
+  <p class="navi-disclaimer" style="margin-top:24px">
+    ※ 本サービスは医療診断ではありません。<br>
+    植物美容体験としてお楽しみください。
+  </p>
+</div>
+
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
   // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
@@ -254,6 +340,7 @@
 
   function detectMode() {
     if (getQuery('mode') === 'navi') return 'navi';
+    if (getQuery('mode') === 'mypage') return 'mypage';
     if (getQuery('salon')) return 'salon';
     try {
       if (localStorage.getItem(SALON_STORAGE_KEY)) return 'salon';
@@ -498,6 +585,112 @@
     document.getElementById('submitBtn').addEventListener('click', submitNavi);
   }
 
+  // ===== マイページフロー =====
+  function escapeHtml_(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function fetchJsonp_(url) {
+    return new Promise(function (resolve, reject) {
+      var cb = 'mp_cb_' + Date.now() + '_' + Math.floor(Math.random() * 1e6);
+      var timer = setTimeout(function () {
+        cleanup();
+        reject(new Error('jsonp timeout'));
+      }, 15000);
+      function cleanup() {
+        try { delete window[cb]; } catch (_) { window[cb] = undefined; }
+        var s = document.getElementById(cb);
+        if (s && s.parentNode) s.parentNode.removeChild(s);
+      }
+      window[cb] = function (data) {
+        clearTimeout(timer);
+        cleanup();
+        resolve(data);
+      };
+      var script = document.createElement('script');
+      script.id = cb;
+      script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
+      script.onerror = function () {
+        clearTimeout(timer);
+        cleanup();
+        reject(new Error('jsonp network error'));
+      };
+      document.body.appendChild(script);
+    });
+  }
+
+  function renderMypage(data) {
+    var p = data.profile || {};
+    document.getElementById('mpGreeting').textContent =
+      (p.displayName || 'お客様') + ' さん';
+
+    var profileHtml = '';
+    if (p.salonName) profileHtml += '<div class="profile-row"><span class="pl">所属サロン</span><span class="pv">' + escapeHtml_(p.salonName) + '</span></div>';
+    if (p.registeredAt) profileHtml += '<div class="profile-row"><span class="pl">ご登録日</span><span class="pv">' + escapeHtml_(p.registeredAt) + '</span></div>';
+    profileHtml += '<div class="profile-row"><span class="pl">これまでの診断回数</span><span class="pv">' + (p.totalDiagnoses || 0) + ' 回</span></div>';
+    document.getElementById('mpProfile').innerHTML = profileHtml;
+
+    var hist = data.history || [];
+    var histEl = document.getElementById('mpHistory');
+    if (hist.length === 0) {
+      histEl.innerHTML = '<div class="history-empty">まだ診断履歴がありません。<br>下のボタンから植物美容AIナビをお試しください🌿</div>';
+    } else {
+      var html = '';
+      hist.forEach(function (h) {
+        html += '<div class="history-card">'
+          + '<div class="history-date">' + escapeHtml_(h.diagnosedAt) + '</div>'
+          + '<div class="history-row"><span class="hl">原液</span>' + escapeHtml_(h.ingredients) + '</div>'
+          + '<div class="history-row"><span class="hl">アロマ</span>' + escapeHtml_(h.aromas) + '</div>'
+          + '</div>';
+      });
+      histEl.innerHTML = html;
+    }
+
+    var btn = document.getElementById('mpRedoBtn');
+    var nextEl = document.getElementById('mpRedoNext');
+    if (data.canDiagnoseAgain) {
+      btn.classList.remove('disabled');
+      btn.href = 'https://liff.line.me/' + LIFF_ID + '?mode=navi';
+      btn.textContent = '再診断する';
+      nextEl.textContent = '';
+    } else {
+      btn.classList.add('disabled');
+      btn.removeAttribute('href');
+      btn.textContent = 'クールダウン中';
+      nextEl.textContent = '次回ご提案：' + (data.nextAvailableDate || '') + ' 以降';
+    }
+  }
+
+  async function runMypageFlow() {
+    document.getElementById('stageCenter').style.display = 'none';
+    document.getElementById('stageNavi').style.display = 'none';
+    document.getElementById('submitBar').style.display = 'none';
+    document.getElementById('stageMypage').style.display = 'block';
+
+    // ローディング表示
+    document.getElementById('mpGreeting').textContent = '読み込み中…';
+
+    var idToken = liff.getIDToken();
+    if (!idToken) {
+      showCenter('エラー', 'ログイン情報を取得できませんでした。<br>LINEアプリから開き直してください。', 'err');
+      return;
+    }
+
+    try {
+      var url = GAS_ENDPOINT + '?path=mypage-data&idToken=' + encodeURIComponent(idToken);
+      var data = await fetchJsonp_(url);
+      if (!data || !data.ok) {
+        showCenter('エラー', 'マイページ情報を取得できませんでした。<br>もう一度開き直してください。', 'err');
+        return;
+      }
+      renderMypage(data);
+    } catch (err) {
+      showCenter('エラー', '通信に失敗しました。電波の良い場所で開き直してください。', 'err');
+    }
+  }
+
   // ===== エントリーポイント =====
   async function main() {
     var mode = detectMode();
@@ -510,6 +703,8 @@
 
       if (mode === 'navi') {
         runNaviFlow();
+      } else if (mode === 'mypage') {
+        await runMypageFlow();
       } else {
         await runSalonFlow();
       }
