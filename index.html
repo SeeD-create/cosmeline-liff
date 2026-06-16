@@ -191,7 +191,7 @@
   <div class="qblock" data-q="q1_skin" data-type="multi" data-required="true">
     <div class="qhead">
       <span class="qnum">Q1</span>
-      <p class="qtitle">現在気になる肌状態は？</p>
+      <p class="qtitle">あなたのお肌の気になる点は？</p>
     </div>
     <p class="qhint">複数選択できます</p>
     <div class="opts"></div>
@@ -201,7 +201,7 @@
   <div class="qblock" data-q="q2_impression" data-type="single" data-required="true">
     <div class="qhead">
       <span class="qnum">Q2</span>
-      <p class="qtitle">現在の肌印象に近いものは？</p>
+      <p class="qtitle">現在のお肌の状態に近いものは？</p>
     </div>
     <div class="opts"></div>
   </div>
@@ -219,7 +219,7 @@
   <div class="qblock" data-q="q4_aroma" data-type="single" data-required="true">
     <div class="qhead">
       <span class="qnum">Q4</span>
-      <p class="qtitle">好きな香りイメージは？</p>
+      <p class="qtitle">好きな香りのイメージは？</p>
     </div>
     <div class="opts"></div>
   </div>
@@ -405,15 +405,19 @@
   }
 
   // ===== 植物美容ナビフロー =====
+  // アトピー（ステロイド治療中）を選んだら診断を停止する（医療領域のため）。
+  // 文字列は GAS 側ゲート（12_liff.js）と完全一致させること。
+  var ATOPY_OPTION = 'アトピー（ステロイド治療中）';
+
   var NAVI_OPTIONS = {
-    q1_skin: ['乾燥', '水分不足', 'ごわつき', '毛穴', '皮脂', 'ハリ不足感', 'くすみ印象', '揺らぎやすい', '敏感傾向', '特になし'],
-    q2_impression: ['乾燥しやすい', 'ベタつきやすい', '季節で変わる', '揺らぎやすい', '比較的安定している'],
-    q3_mood: ['深呼吸したい', 'リラックスしたい', 'リフレッシュしたい', 'やさしく整えたい', '気分を切り替えたい', '前向きな気分になりたい'],
+    q1_skin: ['乾燥', '毛穴', 'シミ', 'しわ', 'ニキビ・吹き出物', '赤み', 'くすみ（目のクマ）', 'たるみ（ハリがない）', '敏感傾向', ATOPY_OPTION, '特になし'],
+    q2_impression: ['乾燥しやすい', 'べたつきやすい（オイリー）', '季節で変わる（揺らぎやすい）', '乾燥とオイリーが混合（化粧崩れしやすい）', '敏感肌', '比較的安定している'],
+    q3_mood: ['リラックスしたい', 'リフレッシュしたい', '優しく整えたい', '気分を切り替えたい', '前向きな気分になりたい', '深呼吸したい'],
     q4_aroma: ['フローラル', '柑橘', '森林', 'ハーブ', '深い落ち着き', 'やさしい香り'],
-    q5_sleep: ['よく眠れている', '浅いことがある', '不規則', '疲れを感じやすい'],
-    q6_season: ['春に揺らぎやすい', '夏にベタつきやすい', '秋冬に乾燥しやすい', '年中変化しやすい', 'あまり感じない'],
-    q7_botanical: ['発酵植物美容', '海藻美容', '和植物美容', '香り植物療法', 'ナチュラル美容', '更年期世代美容'],
-    q8_experience: ['癒されたい', '学びたい', '自分を整えたい', '香りを楽しみたい', '自分だけのコスメを作りたい'],
+    q5_sleep: ['よく眠れている', '浅いことがある', '不規則', '疲れを感じやすい', '夜中に目が覚める', '眠れない'],
+    q6_season: ['春と秋に揺らぎやすい', '夏にべたつきやすい', '冬に乾燥しやすい', '年中変化しやすい', 'あまり感じない'],
+    q7_botanical: ['発酵植物美容', '海藻美容', '和漢植物美容', 'ハーブ植物美容', '女性ホルモン美容', 'ナチュラル美容'],
+    q8_experience: ['若々しくいたい', '自分を整えたい', 'モチベーションを上げたい', '癒されたい', '香りを楽しみたい', '学びたい'],
   };
 
   var naviAnswers = {
@@ -448,6 +452,11 @@
               naviAnswers[q] = naviAnswers[q].filter(function (v) { return v !== label; });
             }
             wrap.classList.toggle('checked', input.checked);
+            // アトピー（ステロイド治療中）を選んだ瞬間に診断停止（医療領域のため）
+            if (q === 'q1_skin' && label === ATOPY_OPTION && input.checked) {
+              showAtopyStop();
+              return;
+            }
           } else {
             naviAnswers[q] = label;
             optsContainer.querySelectorAll('.opt').forEach(function (el) {
@@ -575,6 +584,16 @@
     setTimeout(function () {
       try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {}
     }, 2500);
+  }
+
+  // アトピー（ステロイド治療中）選択時の停止画面（中央カードに切替＝以降フォーム非表示）
+  function showAtopyStop() {
+    showCenter(
+      'アトピーの方は診断できません',
+      'ステロイド治療中の方へは、植物美容のご提案を控えております。<br>'
+      + 'お肌のことは、まず皮膚科専門医にご相談くださいませ🌿',
+      'err'
+    );
   }
 
   function runNaviFlow() {
