@@ -649,6 +649,8 @@
 
     var profileHtml = '';
     if (p.salonName) profileHtml += '<div class="profile-row"><span class="pl">所属サロン</span><span class="pv">' + escapeHtml_(p.salonName) + '</span></div>';
+    // サロンコードは認証済みの人にのみ返ってくる（見返し用）。空なら行ごと出さない。
+    if (p.salonCode) profileHtml += '<div class="profile-row"><span class="pl">サロンコード</span><span class="pv">' + escapeHtml_(p.salonCode) + '</span></div>';
     if (p.registeredAt) profileHtml += '<div class="profile-row"><span class="pl">ご登録日</span><span class="pv">' + escapeHtml_(p.registeredAt) + '</span></div>';
     profileHtml += '<div class="profile-row"><span class="pl">これまでの診断回数</span><span class="pv">' + (p.totalDiagnoses || 0) + ' 回</span></div>';
     document.getElementById('mpProfile').innerHTML = profileHtml;
