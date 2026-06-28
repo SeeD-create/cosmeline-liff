@@ -187,6 +187,18 @@
 
   <div id="alertBox"></div>
 
+  <!-- サロンコード（毎回必須・1問目） -->
+  <div class="qblock" data-q="salon_code">
+    <div class="qhead">
+      <span class="qnum">🔑</span>
+      <p class="qtitle">サロンコード</p>
+    </div>
+    <p class="qhint">サロンでお伝えしたコードをご入力ください（例：MOMO-7K2P）</p>
+    <input type="text" id="salonCodeInput" placeholder="例）MOMO-7K2P" autocomplete="off" autocapitalize="characters"
+      style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #e6dccc;border-radius:10px;font-size:16px;background:#fff;letter-spacing:1px;">
+    <div id="salonCodeStatus" style="margin-top:8px;font-size:13px;"></div>
+  </div>
+
   <!-- Q1 -->
   <div class="qblock" data-q="q1_skin" data-type="multi" data-required="true">
     <div class="qhead">
@@ -516,6 +528,8 @@
 
   function countUnanswered() {
     var n = 0;
+    var codeEl = document.getElementById('salonCodeInput');
+    if (!codeEl || !codeEl.value.trim()) n++;
     if (!naviAnswers.q1_skin || naviAnswers.q1_skin.length === 0) n++;
     ['q2_impression', 'q3_mood', 'q4_aroma', 'q5_sleep', 'q6_season', 'q7_botanical', 'q8_experience'].forEach(function (k) {
       if (!naviAnswers[k]) n++;
@@ -550,7 +564,7 @@
     }
     var btn = document.getElementById('submitBtn');
     btn.disabled = true;
-    btn.textContent = '送信中…';
+    btn.textContent = '確認中…';
 
     var idToken = liff.getIDToken();
     if (!idToken) {
@@ -559,6 +573,29 @@
       btn.textContent = '送信する';
       return;
     }
+
+    // サロンコードを先に検証（写真POSTは no-cors で結果が取れないため、コードのみ JSONP で照合）
+    var code = (document.getElementById('salonCodeInput').value || '').trim();
+    var statusEl = document.getElementById('salonCodeStatus');
+    try {
+      var vr = await fetchJsonp_(GAS_ENDPOINT + '?path=verify-code&idToken='
+        + encodeURIComponent(idToken) + '&code=' + encodeURIComponent(code));
+      if (!vr || !vr.ok) {
+        if (statusEl) { statusEl.textContent = '⚠️ サロンコードが確認できませんでした。もう一度ご確認ください。'; statusEl.style.color = '#c0685e'; }
+        setNaviAlert('サロンコードをご確認ください🙏');
+        btn.disabled = false;
+        btn.textContent = '送信する';
+        return;
+      }
+      if (statusEl) { statusEl.textContent = '✓ ' + (vr.salonName || 'サロン') + ' を確認しました'; statusEl.style.color = '#6f9160'; }
+    } catch (e) {
+      setNaviAlert('通信に失敗しました。電波の良い場所で再度お試しください。');
+      btn.disabled = false;
+      btn.textContent = '送信する';
+      return;
+    }
+
+    btn.textContent = '送信中…';
 
     var payload = {
       idToken: idToken,
@@ -596,8 +633,7 @@
     );
   }
 
-  // フォーム本体を表示（認証ゲート通過後にのみ呼ぶ）
-  function showNaviForm() {
+  function runNaviFlow() {
     document.getElementById('stageCenter').style.display = 'none';
     var mp = document.getElementById('stageMypage');
     if (mp) mp.style.display = 'none';
@@ -605,61 +641,15 @@
     document.getElementById('submitBar').style.display = 'block';
     buildOptions();
     setupPhotoInput();
+    setupCodeInput();
     updateSubmitBtn();
     document.getElementById('submitBtn').addEventListener('click', submitNavi);
   }
 
-  // 診断は「その都度サロンコード認証」が必要。フォームを開く前に認証状態を確認し、
-  // 未認証なら 8問フォームを出さずにコード入力へ誘導する（送信時まで入力させない）。
-  async function runNaviFlow() {
-    showCenter('読み込み中…', 'そのまま少々お待ちください', '');
-
-    var idToken = liff.getIDToken();
-    if (!idToken) {
-      showCenter('エラー', 'ログイン情報を取得できませんでした。<br>LINEアプリから開き直してください。', 'err');
-      return;
-    }
-
-    var data;
-    try {
-      var url = GAS_ENDPOINT + '?path=mypage-data&idToken=' + encodeURIComponent(idToken);
-      data = await fetchJsonp_(url);
-    } catch (err) {
-      showCenter('エラー', '通信に失敗しました。電波の良い場所で開き直してください。', 'err');
-      return;
-    }
-    if (!data || !data.ok) {
-      showCenter('エラー', '情報を取得できませんでした。<br>もう一度開き直してください。', 'err');
-      return;
-    }
-
-    // 未同意 → 同意書へ誘導（mypage-data 側がトークに同意案内をpush済み）
-    if (!data.consented) {
-      showCenter('まず同意書のご確認を',
-        'ご利用には同意書へのご同意が必要です。<br>トークの同意案内をご確認ください🌿', 'ok');
-      setTimeout(function () { try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {} }, 3500);
-      return;
-    }
-
-    // 未認証 → サロンコード入力へ（毎回の診断前にコードが必要）
-    if (!data.salonVerified) {
-      await requestSalonCode(idToken);
-      return;
-    }
-
-    // 認証OK → フォーム表示
-    showNaviForm();
-  }
-
-  // 未認証時：トークにサロンコード入力を促し、LIFFは案内を出して閉じる
-  async function requestSalonCode(idToken) {
-    try {
-      await fetchJsonp_(GAS_ENDPOINT + '?path=request-code&idToken=' + encodeURIComponent(idToken));
-    } catch (_) { /* push失敗でも画面案内は出す */ }
-    showCenter('サロンコードの入力をお願いします',
-      '診断のご利用には、サロンからお伝えしたサロンコードの入力が必要です。<br>'
-      + 'トークに戻り、コードを送信してください🌿', 'ok');
-    setTimeout(function () { try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {} }, 3500);
+  // サロンコード入力欄の変化で送信ボタンの残数を更新
+  function setupCodeInput() {
+    var el = document.getElementById('salonCodeInput');
+    if (el) el.addEventListener('input', updateSubmitBtn);
   }
 
   // ===== マイページフロー =====
