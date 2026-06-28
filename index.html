@@ -596,14 +596,70 @@
     );
   }
 
-  function runNaviFlow() {
+  // フォーム本体を表示（認証ゲート通過後にのみ呼ぶ）
+  function showNaviForm() {
     document.getElementById('stageCenter').style.display = 'none';
+    var mp = document.getElementById('stageMypage');
+    if (mp) mp.style.display = 'none';
     document.getElementById('stageNavi').style.display = 'block';
     document.getElementById('submitBar').style.display = 'block';
     buildOptions();
     setupPhotoInput();
     updateSubmitBtn();
     document.getElementById('submitBtn').addEventListener('click', submitNavi);
+  }
+
+  // 診断は「その都度サロンコード認証」が必要。フォームを開く前に認証状態を確認し、
+  // 未認証なら 8問フォームを出さずにコード入力へ誘導する（送信時まで入力させない）。
+  async function runNaviFlow() {
+    showCenter('読み込み中…', 'そのまま少々お待ちください', '');
+
+    var idToken = liff.getIDToken();
+    if (!idToken) {
+      showCenter('エラー', 'ログイン情報を取得できませんでした。<br>LINEアプリから開き直してください。', 'err');
+      return;
+    }
+
+    var data;
+    try {
+      var url = GAS_ENDPOINT + '?path=mypage-data&idToken=' + encodeURIComponent(idToken);
+      data = await fetchJsonp_(url);
+    } catch (err) {
+      showCenter('エラー', '通信に失敗しました。電波の良い場所で開き直してください。', 'err');
+      return;
+    }
+    if (!data || !data.ok) {
+      showCenter('エラー', '情報を取得できませんでした。<br>もう一度開き直してください。', 'err');
+      return;
+    }
+
+    // 未同意 → 同意書へ誘導（mypage-data 側がトークに同意案内をpush済み）
+    if (!data.consented) {
+      showCenter('まず同意書のご確認を',
+        'ご利用には同意書へのご同意が必要です。<br>トークの同意案内をご確認ください🌿', 'ok');
+      setTimeout(function () { try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {} }, 3500);
+      return;
+    }
+
+    // 未認証 → サロンコード入力へ（毎回の診断前にコードが必要）
+    if (!data.salonVerified) {
+      await requestSalonCode(idToken);
+      return;
+    }
+
+    // 認証OK → フォーム表示
+    showNaviForm();
+  }
+
+  // 未認証時：トークにサロンコード入力を促し、LIFFは案内を出して閉じる
+  async function requestSalonCode(idToken) {
+    try {
+      await fetchJsonp_(GAS_ENDPOINT + '?path=request-code&idToken=' + encodeURIComponent(idToken));
+    } catch (_) { /* push失敗でも画面案内は出す */ }
+    showCenter('サロンコードの入力をお願いします',
+      '診断のご利用には、サロンからお伝えしたサロンコードの入力が必要です。<br>'
+      + 'トークに戻り、コードを送信してください🌿', 'ok');
+    setTimeout(function () { try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {} }, 3500);
   }
 
   // ===== マイページフロー =====
