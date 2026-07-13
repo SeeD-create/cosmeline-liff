@@ -187,16 +187,23 @@
 
   <div id="alertBox"></div>
 
-  <!-- サロンコード（毎回必須・1問目） -->
-  <div class="qblock" data-q="salon_code">
+  <!--
+    サロン確認（店頭QRの診断トークンで自動認証）
+    旧「サロンコード手入力欄」は廃止した。コードの文字列をお客様の目に触れさせないため。
+    QRから開かれた場合のみトークンが渡り、ここにサロン名が表示される。
+    トークンが無い場合は #naviNoToken を出し、送信できないようにする。
+  -->
+  <div class="qblock" data-q="salon_check">
     <div class="qhead">
       <span class="qnum">🔑</span>
-      <p class="qtitle">サロンコード</p>
+      <p class="qtitle">サロンの確認</p>
     </div>
-    <p class="qhint">サロンでお伝えしたコードをご入力ください（例：MOMO-7K2P）</p>
-    <input type="text" id="salonCodeInput" placeholder="例）MOMO-7K2P" autocomplete="off" autocapitalize="characters"
-      style="width:100%;box-sizing:border-box;padding:12px 14px;border:1px solid #e6dccc;border-radius:10px;font-size:16px;background:#fff;letter-spacing:1px;">
-    <div id="salonCodeStatus" style="margin-top:8px;font-size:13px;"></div>
+    <div id="salonCodeStatus" style="font-size:13px;"></div>
+    <div id="naviNoToken" style="display:none;font-size:13.5px;line-height:1.7;color:#c0685e;">
+      サロンの確認ができませんでした🙏<br>
+      お手数ですが、<b>店頭の「診断用QRコード」から開き直してください。</b><br>
+      <span style="color:#8a8078;font-size:12.5px;">読み取りがうまくいかない場合は、サロンのスタッフへお声がけください。</span>
+    </div>
   </div>
 
   <!-- Q1 -->
@@ -528,8 +535,9 @@
 
   function countUnanswered() {
     var n = 0;
-    var codeEl = document.getElementById('salonCodeInput');
-    if (!codeEl || !codeEl.value.trim()) n++;
+    // サロンの確認は店頭QRの診断トークンで自動的に済む（手入力欄は廃止）。
+    // トークンが無い＝QR以外から開かれた場合は「未完了」として送信させない。
+    if (!getQuery('t')) n++;
     if (!naviAnswers.q1_skin || naviAnswers.q1_skin.length === 0) n++;
     ['q2_impression', 'q3_mood', 'q4_aroma', 'q5_sleep', 'q6_season', 'q7_botanical', 'q8_experience'].forEach(function (k) {
       if (!naviAnswers[k]) n++;
@@ -574,15 +582,23 @@
       return;
     }
 
-    // サロンコードを先に検証（写真POSTは no-cors で結果が取れないため、コードのみ JSONP で照合）
-    var code = (document.getElementById('salonCodeInput').value || '').trim();
+    // サロンを先に検証（写真POSTは no-cors で結果が取れないため、トークンのみ JSONP で照合）
+    // 認証は店頭QRの診断トークンのみ。手入力のサロンコードは廃止した。
+    var naviToken = getQuery('t');
     var statusEl = document.getElementById('salonCodeStatus');
+    if (!naviToken) {
+      showNoToken_();
+      setNaviAlert('店頭の「診断用QRコード」から開き直してください🙏');
+      btn.disabled = false;
+      btn.textContent = '送信する';
+      return;
+    }
     try {
       var vr = await fetchJsonp_(GAS_ENDPOINT + '?path=verify-code&idToken='
-        + encodeURIComponent(idToken) + '&code=' + encodeURIComponent(code));
+        + encodeURIComponent(idToken) + '&t=' + encodeURIComponent(naviToken));
       if (!vr || !vr.ok) {
-        if (statusEl) { statusEl.textContent = '⚠️ サロンコードが確認できませんでした。もう一度ご確認ください。'; statusEl.style.color = '#c0685e'; }
-        setNaviAlert('サロンコードをご確認ください🙏');
+        showNoToken_();
+        setNaviAlert('店頭の「診断用QRコード」から開き直してください🙏');
         btn.disabled = false;
         btn.textContent = '送信する';
         return;
@@ -646,10 +662,26 @@
     document.getElementById('submitBtn').addEventListener('click', submitNavi);
   }
 
-  // サロンコード入力欄の変化で送信ボタンの残数を更新
+  // サロンの確認表示（店頭QRの診断トークン）。手入力欄は廃止したので、
+  // ここではトークンの有無に応じて「確認中」か「QRから開き直してください」を出すだけ。
   function setupCodeInput() {
-    var el = document.getElementById('salonCodeInput');
-    if (el) el.addEventListener('input', updateSubmitBtn);
+    var statusEl = document.getElementById('salonCodeStatus');
+    if (getQuery('t')) {
+      if (statusEl) {
+        statusEl.textContent = '✓ 店頭QRからご来店を確認しました';
+        statusEl.style.color = '#6f9160';
+      }
+    } else {
+      showNoToken_();
+    }
+  }
+
+  // トークンが無い（QR以外から開かれた）ときの案内
+  function showNoToken_() {
+    var statusEl = document.getElementById('salonCodeStatus');
+    var box = document.getElementById('naviNoToken');
+    if (statusEl) statusEl.textContent = '';
+    if (box) box.style.display = 'block';
   }
 
   // ===== マイページフロー =====
