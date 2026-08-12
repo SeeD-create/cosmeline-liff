@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>ボタニカルビューティデザイナー養成講座</title>
+<!--
+  講座LIFF（5画面を ?mode= で切替）
+    lead   … リード獲得（氏名・メール・個人情報同意）
+    taiken … 体験会・相談会の日程選択
+    apply  … 受講申込（同意3点 → 同一ページ内で決済選択へ遷移）
+    kadai  … 課題提出（写真＋コンサル希望日3つ）
+    portal … 受講ポータル（ステータス判定 → Vimeo埋め込み）
+
+  正 = cosmeline-liff/kouza/index.html（GitHub Pages）
+  ミラー = cosmeline-demo/liff/kouza/index.html（編集したら両方そろえてdiff一致確認）
+
+  ★KOUZA_LIFF_ID は講座用LIFF発行後に記入（段2）。未記入の間は準備中画面になる。
+-->
+<style>
+  :root {
+    /* ベージュ・グレージュ系（先方希望） */
+    --bg: #F6F2EC;
+    --card: #FFFFFF;
+    --line: #E5DDD1;
+    --ink: #3E3A34;
+    --mute: #8A8177;
+    --accent: #8C7B66;      /* グレージュ（見出し・枠） */
+    --accent-deep: #6E5F4D; /* ボタン */
+    --ok: #4F8F35;
+    --err: #B4382F;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    background: var(--bg); color: var(--ink);
+    font-size: 15px; line-height: 1.7;
+    padding-bottom: 40px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 18px 16px; }
+  .brand {
+    text-align: center; padding: 14px 0 10px;
+    color: var(--accent); font-size: 12px; letter-spacing: .18em;
+  }
+  h1 { font-size: 19px; text-align: center; margin-bottom: 4px; letter-spacing: .04em; }
+  .lede { text-align: center; color: var(--mute); font-size: 12.5px; margin-bottom: 16px; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px 16px; margin-bottom: 14px;
+  }
+  .card h2 { font-size: 15px; color: var(--accent-deep); margin-bottom: 10px; }
+
+  label.fld { display: block; font-size: 13px; color: var(--accent-deep); margin: 12px 0 4px; font-weight: 600; }
+  label.fld .req { color: var(--err); font-size: 11px; margin-left: 6px; }
+  input[type=text], input[type=email], input[type=tel], input[type=date] {
+    width: 100%; padding: 11px 12px; font-size: 16px;
+    border: 1px solid var(--line); border-radius: 8px; background: #FDFCFA; color: var(--ink);
+  }
+  input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+
+  .consent-box {
+    border: 1px solid var(--line); border-radius: 8px; background: #FBF9F5;
+    max-height: 160px; overflow-y: auto; padding: 10px 12px;
+    font-size: 12px; color: #5A5348; white-space: pre-wrap; margin: 8px 0;
+  }
+  .chk { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0 14px; }
+  .chk input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  .chk span { font-size: 13.5px; }
+
+  .opt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .opt {
+    display: flex; align-items: flex-start; gap: 10px;
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #FDFCFA;
+  }
+  .opt input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+  .opt.sel { border-color: var(--accent); background: #F4EEE5; }
+  .opt small { display: block; color: var(--mute); }
+
+  .btn {
+    display: block; width: 100%; padding: 14px; margin-top: 16px;
+    font-size: 16px; font-weight: 700; letter-spacing: .06em;
+    color: #fff; background: linear-gradient(170deg, #9A8770 0%, var(--accent-deep) 70%);
+    border: none; border-radius: 999px; cursor: pointer;
+  }
+  .btn:disabled { opacity: .45; }
+  .btn.sub { background: none; color: var(--accent-deep); border: 1px solid var(--accent); font-weight: 600; }
+
+  .note { font-size: 11.5px; color: var(--mute); margin-top: 10px; }
+  .alert { color: var(--err); font-size: 13px; margin-top: 10px; display: none; }
+
+  /* 中央メッセージ（ローディング・完了・エラー） */
+  .center { text-align: center; padding: 60px 20px; display: none; }
+  .center .ttl { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+  .center .ttl.ok { color: var(--ok); }
+  .center .ttl.err { color: var(--err); }
+  .center .msg { font-size: 13.5px; color: var(--mute); }
+  .spinner {
+    width: 34px; height: 34px; margin: 0 auto 16px;
+    border: 3px solid var(--line); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ポータル */
+  .chapter { border: 1px solid var(--line); border-radius: 12px; background: var(--card); margin-bottom: 14px; overflow: hidden; }
+  .chapter .head { padding: 12px 14px 4px; }
+  .chapter .no { font-size: 11px; color: var(--accent); letter-spacing: .12em; }
+  .chapter .ttl { font-size: 15px; font-weight: 700; }
+  .video-frame { position: relative; width: 100%; aspect-ratio: 16/9; background: #EFEAE1; margin-top: 8px; }
+  .video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .video-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--mute); font-size: 13px; gap: 6px;
+  }
+  .video-placeholder .mark { font-size: 26px; }
+
+  .steps { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; }
+  .steps i { width: 26px; height: 4px; border-radius: 2px; background: var(--line); }
+  .steps i.on { background: var(--accent); }
+
+  .photo-preview { width: 100%; border-radius: 10px; border: 1px solid var(--line); display: none; margin-top: 8px; }
+  .file-btn {
+    display: block; text-align: center; padding: 12px; margin-top: 6px;
+    border: 1.5px dashed var(--accent); border-radius: 10px; color: var(--accent-deep);
+    font-size: 14px; background: #FBF9F5; cursor: pointer;
+  }
+  .disclaimer { text-align: center; font-size: 11px; color: var(--mute); margin-top: 22px; }
+</style>
+</head>
+<body>
+
+<div class="brand">BOTANICAL BEAUTY DESIGNER</div>
+
+<!-- 中央メッセージ（ローディング／完了／エラー共用） -->
+<div class="center" id="stageCenter">
+  <div class="spinner" id="spinner"></div>
+  <div class="ttl" id="centerTitle">読み込み中…</div>
+  <div class="msg" id="centerMsg">そのまま少々お待ちください</div>
+</div>
+
+<!-- ① リード獲得 -->
+<div class="wrap" id="stageLead" style="display:none">
+  <h1>ご案内先の登録</h1>
+  <p class="lede">講座のご案内をお届けするために、お名前とメールアドレスをお願いします（30秒で終わります）</p>
+  <div class="card">
+    <label class="fld">お名前<span class="req">必須</span></label>
+    <input type="text" id="leadName" placeholder="例）山田 花子" autocomplete="name">
+    <label class="fld">メールアドレス<span class="req">必須</span></label>
+    <input type="email" id="leadEmail" placeholder="例）hanako@example.com" autocomplete="email" inputmode="email">
+    <label class="fld">個人情報の取り扱い</label>
+    <div class="consent-box" id="privacyText">読み込み中…</div>
+    <label class="chk"><input type="checkbox" id="leadAgree"><span>個人情報の取り扱いに同意します</span></label>
+    <button class="btn" id="leadSubmit" disabled>登録する</button>
+    <div class="alert" id="leadAlert"></div>
+  </div>
+</div>
+
+<!-- ② 体験会・相談会 -->
+<div class="wrap" id="stageTaiken" style="display:none">
+  <h1>体験会・相談会のお申し込み</h1>
+  <p class="lede">ご都合のよい日程をお選びください</p>
+  <div class="card">
+    <div class="opt-list" id="slotList"></div>
+    <div class="note" id="slotEmpty" style="display:none">
+      ただいま受付中の日程がありません。<br>
+      新しい日程が決まりましたらLINEでお知らせします🌿
+    </div>
+    <button class="btn" id="taikenSubmit" disabled>この日程で申し込む</button>
+    <div class="alert" id="taikenAlert"></div>
+  </div>
+</div>
+
+<!-- ③ 受講申込（STEP1 同意 → STEP2 決済選択） -->
+<div class="wrap" id="stageApply" style="display:none">
+  <h1>受講のお申し込み</h1>
+  <div class="steps"><i id="stepDot1" class="on"></i><i id="stepDot2"></i></div>
+
+  <div id="applyStep1">
+    <p class="lede">お客様情報のご入力と、規約へのご同意をお願いします</p>
+    <div class="card">
+      <h2>お客様情報</h2>
+      <label class="fld">お名前<span class="req">必須</span></label>
+      <input type="text" id="applyName" placeholder="例）山田 花子" autocomplete="name">
+      <label class="fld">ご住所<span class="req">必須</span></label>
+      <input type="text" id="applyAddress" placeholder="例）福岡県福岡市中央区平尾1-2-3" autocomplete="street-address">
+      <label class="fld">お電話番号<span class="req">必須</span></label>
+      <input type="tel" id="applyPhone" placeholder="例）09012345678" autocomplete="tel" inputmode="tel">
+    </div>
+    <div class="card">
+      <h2>受講規約</h2>
+      <div class="consent-box" id="termsText">読み込み中…</div>
+      <label class="chk"><input type="checkbox" id="agreeTerms"><span>受講規約に同意します</span></label>
+      <h2>利用規約</h2>
+      <div class="consent-box" id="usageText">読み込み中…</div>
+      <label class="chk"><input type="checkbox" id="agreeUsage"><span>利用規約に同意します</span></label>
+      <h2>特定商取引法に基づく表記</h2>
+      <div class="consent-box" id="tokushohoText">読み込み中…</div>
+      <label class="chk"><input type="checkbox" id="agreeTokushoho"><span>特定商取引法に基づく表記を確認しました</span></label>
+      <button class="btn" id="applySubmit" disabled>同意して申し込む</button>
+      <p class="note">ご同意いただいた内容の控えは、LINEのトークにPDFでお送りします。</p>
+      <div class="alert" id="applyAlert"></div>
+    </div>
+  </div>
+
+  <div id="applyStep2" style="display:none">
+    <p class="lede">お申し込みを受け付けました。<br>お支払い方法をお選びください</p>
+    <div class="card">
+      <div class="opt-list">
+        <label class="opt"><input type="radio" name="payMethod" value="univapay">
+          <span>クレジットカード決済<small>UnivaPayの決済ページをご案内します</small></span></label>
+        <label class="opt"><input type="radio" name="payMethod" value="bank">
+          <span>銀行振込（前払い）<small>振込先をLINEでご案内します ※振込手数料はご負担ください</small></span></label>
+        <label class="opt"><input type="radio" name="payMethod" value="orico">
+          <span>オリコローン<small>お手続きの流れを担当者よりご案内します</small></span></label>
+      </div>
+      <button class="btn" id="paySubmit" disabled>この方法で進める</button>
+      <p class="note">ご入金の確認は営業日ベースで行っております。確認でき次第、講座の視聴開始をLINEでお知らせします。</p>
+      <div class="alert" id="payAlert"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ④ 課題提出 -->
+<div class="wrap" id="stageKadai" style="display:none">
+  <h1>課題のご提出</h1>
+  <p class="lede">課題のお写真と、卒業コンサルのご希望日をお送りください</p>
+  <div class="card">
+    <h2>課題の写真</h2>
+    <label class="file-btn" for="kadaiPhoto">📷 写真を選ぶ（タップして撮影も可）</label>
+    <input type="file" id="kadaiPhoto" accept="image/*" style="display:none">
+    <img class="photo-preview" id="kadaiPreview" alt="課題写真プレビュー">
+  </div>
+  <div class="card">
+    <h2>卒業コンサルのご希望日</h2>
+    <label class="fld">第1希望<span class="req">必須</span></label>
+    <input type="date" id="kadaiDate1">
+    <label class="fld">第2希望</label>
+    <input type="date" id="kadaiDate2">
+    <label class="fld">第3希望</label>
+    <input type="date" id="kadaiDate3">
+    <button class="btn" id="kadaiSubmit" disabled>提出する</button>
+    <p class="note">スタッフが内容を確認し、ディプロマの発行とコンサル日程をLINEでご案内します（営業日ベース）。</p>
+    <div class="alert" id="kadaiAlert"></div>
+  </div>
+</div>
+
+<!-- ⑤ 受講ポータル -->
+<div class="wrap" id="stagePortal" style="display:none">
+  <h1>講座</h1>
+  <p class="lede" id="portalHello"></p>
+  <div id="portalChapters"></div>
+  <button class="btn" id="portalDone" style="display:none">全部見終わりました（課題の提出へ）</button>
+  <p class="note" id="portalSubmittedNote" style="display:none">
+    課題はご提出済みです。スタッフの確認をお待ちください🌿</p>
+</div>
+
+<p class="disclaimer">ボタニカルビューティデザイナー養成講座｜株式会社暇楽</p>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script>
+  // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
+  var KOUZA_LIFF_ID = "";   // ★段2：講座用LIFFを発行したら記入（既存LIFFチャネルに追加発行）
+  var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
+  // ▲▲▲ 設定ここまで ▲▲▲
+
+  var STAGES = ['stageCenter', 'stageLead', 'stageTaiken', 'stageApply', 'stageKadai', 'stagePortal'];
+
+  // ===== 汎用 =====
+  function $(id) { return document.getElementById(id); }
+
+  function show(stageId) {
+    STAGES.forEach(function (s) {
+      $(s).style.display = (s === stageId) ? (s === 'stageCenter' ? 'block' : 'block') : 'none';
+    });
+  }
+
+  function showCenter(title, msg, cls) {
+    show('stageCenter');
+    $('spinner').style.display = (cls === 'ok' || cls === 'err') ? 'none' : '';
+    $('centerTitle').textContent = title;
+    $('centerTitle').className = 'ttl' + (cls ? ' ' + cls : '');
+    $('centerMsg').innerHTML = msg || '';
+  }
+
+  function setAlert(id, text) {
+    var el = $(id);
+    el.textContent = text || '';
+    el.style.display = text ? 'block' : 'none';
+  }
+
+  function getQuery(key) {
+    var q = new URLSearchParams(window.location.search);
+    var v = q.get(key);
+    if (v) return v;
+    var state = q.get('liff.state');
+    if (state) {
+      var m = decodeURIComponent(state).match(new RegExp(key + '=([^&]+)'));
+      if (m) return decodeURIComponent(m[1]);
+    }
+    return '';
+  }
+
+  function fetchJsonp_(url) {
+    return new Promise(function (resolve, reject) {
+      var cb = 'jsonp_' + Math.random().toString(36).slice(2);
+      var timer = setTimeout(function () {
+        cleanup();
+        reject(new Error('jsonp timeout'));
+      }, 20000);
+      function cleanup() {
+        clearTimeout(timer);
+        delete window[cb];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cb] = function (data) { cleanup(); resolve(data); };
+      var script = document.createElement('script');
+      script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + cb;
+      script.onerror = function () { cleanup(); reject(new Error('jsonp network error')); };
+      document.body.appendChild(script);
+    });
+  }
+
+  function api_(path, params) {
+    var url = GAS_ENDPOINT + '?ch=kouza&path=' + path;
+    Object.keys(params || {}).forEach(function (k) {
+      url += '&' + k + '=' + encodeURIComponent(params[k]);
+    });
+    return fetchJsonp_(url);
+  }
+
+  function idToken_() {
+    try { return liff.getIDToken() || ''; } catch (e) { return ''; }
+  }
+
+  function closeSoon_() {
+    setTimeout(function () {
+      try { if (liff.isInClient()) liff.closeWindow(); } catch (_) {}
+    }, 2500);
+  }
+
+  // ===== ① リード獲得 =====
+  function runLead() {
+    show('stageLead');
+    api_('kouza-consent-texts', {}).then(function (res) {
+      if (res && res.ok) $('privacyText').textContent = res.texts.privacy;
+    }).catch(function () {});
+
+    function update() {
+      $('leadSubmit').disabled = !(
+        $('leadName').value.trim() && $('leadEmail').value.trim() && $('leadAgree').checked
+      );
+    }
+    ['leadName', 'leadEmail'].forEach(function (id) { $(id).addEventListener('input', update); });
+    $('leadAgree').addEventListener('change', update);
+
+    $('leadSubmit').addEventListener('click', function () {
+      setAlert('leadAlert', '');
+      $('leadSubmit').disabled = true;
+      showCenter('送信中…', 'そのまま少々お待ちください');
+      api_('kouza-lead', {
+        idToken: idToken_(),
+        name: $('leadName').value.trim(),
+        email: $('leadEmail').value.trim(),
+        agree: '1',
+      }).then(function (res) {
+        if (res && res.ok) {
+          showCenter('登録ありがとうございます', 'LINEのトークにご案内をお送りしました🌿', 'ok');
+          closeSoon_();
+        } else {
+          show('stageLead');
+          $('leadSubmit').disabled = false;
+          setAlert('leadAlert', errText_(res));
+        }
+      }).catch(function () { failBack_('stageLead', 'leadSubmit', 'leadAlert'); });
+    });
+  }
+
+  // ===== ② 体験会・相談会 =====
+  var selectedSlot = '';
+  function runTaiken() {
+    show('stageTaiken');
+    api_('kouza-taiken-slots', {}).then(function (res) {
+      var list = $('slotList');
+      list.innerHTML = '';
+      var slots = (res && res.ok && res.slots) || [];
+      if (!slots.length) {
+        $('slotEmpty').style.display = 'block';
+        return;
+      }
+      slots.forEach(function (s) {
+        var label = document.createElement('label');
+        label.className = 'opt';
+        var input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'slot';
+        input.value = s.id;
+        var span = document.createElement('span');
+        span.textContent = s.label;
+        if (s.note) {
+          var small = document.createElement('small');
+          small.textContent = s.note;
+          span.appendChild(small);
+        }
+        input.addEventListener('change', function () {
+          selectedSlot = s.id;
+          list.querySelectorAll('.opt').forEach(function (el) { el.classList.remove('sel'); });
+          label.classList.add('sel');
+          $('taikenSubmit').disabled = false;
+        });
+        label.appendChild(input);
+        label.appendChild(span);
+        list.appendChild(label);
+      });
+    }).catch(function () {
+      $('slotEmpty').style.display = 'block';
+    });
+
+    $('taikenSubmit').addEventListener('click', function () {
+      if (!selectedSlot) return;
+      setAlert('taikenAlert', '');
+      $('taikenSubmit').disabled = true;
+      showCenter('送信中…', 'そのまま少々お待ちください');
+      api_('kouza-taiken', { idToken: idToken_(), slotId: selectedSlot })
+        .then(function (res) {
+          if (res && res.ok) {
+            showCenter('お申し込みを受け付けました', 'LINEのトークに詳細をお送りしました🌿', 'ok');
+            closeSoon_();
+          } else {
+            show('stageTaiken');
+            $('taikenSubmit').disabled = false;
+            setAlert('taikenAlert', errText_(res));
+          }
+        }).catch(function () { failBack_('stageTaiken', 'taikenSubmit', 'taikenAlert'); });
+    });
+  }
+
+  // ===== ③ 受講申込 =====
+  function runApply() {
+    show('stageApply');
+    api_('kouza-consent-texts', {}).then(function (res) {
+      if (res && res.ok) {
+        $('termsText').textContent = res.texts.terms;
+        $('usageText').textContent = res.texts.usage;
+        $('tokushohoText').textContent = res.texts.tokushoho;
+      }
+    }).catch(function () {});
+
+    function update() {
+      $('applySubmit').disabled = !(
+        $('applyName').value.trim() && $('applyAddress').value.trim() && $('applyPhone').value.trim()
+        && $('agreeTerms').checked && $('agreeUsage').checked && $('agreeTokushoho').checked
+      );
+    }
+    ['applyName', 'applyAddress', 'applyPhone'].forEach(function (id) { $(id).addEventListener('input', update); });
+    ['agreeTerms', 'agreeUsage', 'agreeTokushoho'].forEach(function (id) { $(id).addEventListener('change', update); });
+
+    $('applySubmit').addEventListener('click', function () {
+      setAlert('applyAlert', '');
+      $('applySubmit').disabled = true;
+      showCenter('送信中…', 'そのまま少々お待ちください');
+      api_('kouza-apply', {
+        idToken: idToken_(),
+        name: $('applyName').value.trim(),
+        address: $('applyAddress').value.trim(),
+        phone: $('applyPhone').value.trim(),
+        agreeTerms: '1', agreeUsage: '1', agreeTokushoho: '1',
+      }).then(function (res) {
+        if (res && res.ok) {
+          // 同じLIFF内で決済選択へ遷移（設計どおり）
+          show('stageApply');
+          $('applyStep1').style.display = 'none';
+          $('applyStep2').style.display = 'block';
+          $('stepDot2').classList.add('on');
+          window.scrollTo(0, 0);
+        } else {
+          show('stageApply');
+          $('applySubmit').disabled = false;
+          setAlert('applyAlert', errText_(res));
+        }
+      }).catch(function () { failBack_('stageApply', 'applySubmit', 'applyAlert'); });
+    });
+
+    document.querySelectorAll('input[name=payMethod]').forEach(function (input) {
+      input.addEventListener('change', function () {
+        document.querySelectorAll('#applyStep2 .opt').forEach(function (el) { el.classList.remove('sel'); });
+        input.closest('.opt').classList.add('sel');
+        $('paySubmit').disabled = false;
+      });
+    });
+
+    $('paySubmit').addEventListener('click', function () {
+      var checked = document.querySelector('input[name=payMethod]:checked');
+      if (!checked) return;
+      setAlert('payAlert', '');
+      $('paySubmit').disabled = true;
+      showCenter('送信中…', 'そのまま少々お待ちください');
+      api_('kouza-payment', { idToken: idToken_(), method: checked.value })
+        .then(function (res) {
+          if (res && res.ok) {
+            showCenter('ありがとうございます', 'お支払いのご案内をLINEのトークにお送りしました🌿<br>ご確認ください。', 'ok');
+            closeSoon_();
+          } else {
+            show('stageApply');
+            $('paySubmit').disabled = false;
+            setAlert('payAlert', errText_(res));
+          }
+        }).catch(function () { failBack_('stageApply', 'paySubmit', 'payAlert'); });
+    });
+  }
+
+  // ===== ④ 課題提出 =====
+  var kadaiPhotoBase64 = '';
+  var kadaiPhotoMime = '';
+  function runKadai() {
+    show('stageKadai');
+
+    $('kadaiPhoto').addEventListener('change', function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      compressToBase64(file, function (base64, mime, dataUrl) {
+        kadaiPhotoBase64 = base64;
+        kadaiPhotoMime = mime;
+        $('kadaiPreview').src = dataUrl;
+        $('kadaiPreview').style.display = 'block';
+        update();
+      });
+    });
+
+    function update() {
+      $('kadaiSubmit').disabled = !(kadaiPhotoBase64 && $('kadaiDate1').value);
+    }
+    ['kadaiDate1', 'kadaiDate2', 'kadaiDate3'].forEach(function (id) { $(id).addEventListener('change', update); });
+
+    $('kadaiSubmit').addEventListener('click', function () {
+      setAlert('kadaiAlert', '');
+      $('kadaiSubmit').disabled = true;
+      showCenter('送信中…', '写真をお送りしています。そのまま少々お待ちください');
+      // 写真つきのため POST（no-cors＝結果は取れない。受付結果はLINEのpushで届く）
+      fetch(GAS_ENDPOINT + '?ch=kouza&path=kouza-kadai', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({
+          idToken: idToken_(),
+          photoBase64: kadaiPhotoBase64,
+          photoMime: kadaiPhotoMime,
+          date1: $('kadaiDate1').value,
+          date2: $('kadaiDate2').value,
+          date3: $('kadaiDate3').value,
+        }),
+      });
+      setTimeout(function () {
+        showCenter('提出を送信しました', 'LINEのトークに受付のメッセージが届いたら完了です🌿<br>（届かない場合はもう一度お試しください）', 'ok');
+        closeSoon_();
+      }, 1800);
+    });
+  }
+
+  function compressToBase64(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      var img = new Image();
+      img.onload = function () {
+        var MAX = 1280;
+        var w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          var r = Math.min(MAX / w, MAX / h);
+          w = Math.round(w * r); h = Math.round(h * r);
+        }
+        var canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        cb(dataUrl.split(',')[1], 'image/jpeg', dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ===== ⑤ 受講ポータル =====
+  function runPortal() {
+    showCenter('読み込み中…', 'そのまま少々お待ちください');
+    api_('kouza-portal-data', { idToken: idToken_() }).then(function (res) {
+      if (!res || !res.ok) {
+        showCenter('エラー', 'データを取得できませんでした。<br>LINEアプリから開き直してください。', 'err');
+        return;
+      }
+      if (!res.allowed) {
+        showCenter('講座', escapeHtml_(res.message).replace(/\n/g, '<br>'), 'ok');
+        return;
+      }
+      show('stagePortal');
+      $('portalHello').textContent = (res.displayName ? res.displayName + 'さん、' : '') + 'ようこそ🌿';
+
+      var box = $('portalChapters');
+      box.innerHTML = '';
+      (res.videos || []).forEach(function (v) {
+        var div = document.createElement('div');
+        div.className = 'chapter';
+        var frame;
+        if (v.vimeoId) {
+          frame = '<div class="video-frame"><iframe src="https://player.vimeo.com/video/'
+            + encodeURIComponent(v.vimeoId)
+            + '" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen'
+            + ' title="' + escapeHtml_(v.title) + '"></iframe></div>';
+        } else {
+          // Vimeo ID 未設定＝プレースホルダー（IDを講座動画タブに入れるだけで再生される）
+          frame = '<div class="video-frame"><div class="video-placeholder">'
+            + '<span class="mark">🎬</span><span>この章の動画は準備中です</span></div></div>';
+        }
+        div.innerHTML = '<div class="head"><div class="no">' + escapeHtml_(v.no) + '</div>'
+          + '<div class="ttl">' + escapeHtml_(v.title) + '</div></div>' + frame;
+        box.appendChild(div);
+      });
+
+      if (res.submitted) {
+        $('portalSubmittedNote').style.display = 'block';
+      } else {
+        $('portalDone').style.display = 'block';
+        $('portalDone').addEventListener('click', function () {
+          if (confirm('全ての章を見終わりましたか？\n課題の提出に進みます。')) {
+            window.location.href = 'https://liff.line.me/' + KOUZA_LIFF_ID + '?mode=kadai';
+          }
+        });
+      }
+    }).catch(function () {
+      showCenter('エラー', '通信に失敗しました。<br>電波の良い場所でもう一度お試しください。', 'err');
+    });
+  }
+
+  // ===== 共通エラー =====
+  function errText_(res) {
+    var code = res && res.error;
+    if (code === 'bad email') return 'メールアドレスの形式をご確認ください。';
+    if (code === 'slot closed' || code === 'unknown slot') return 'この日程は受付を終了しました。他の日程をお選びください。';
+    return '送信できませんでした。時間をおいてもう一度お試しください。';
+  }
+  function failBack_(stageId, btnId, alertId) {
+    show(stageId);
+    $(btnId).disabled = false;
+    setAlert(alertId, '通信に失敗しました。電波の良い場所でもう一度お試しください。');
+  }
+  function escapeHtml_(s) {
+    return String(s || '').replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  // ===== 起動 =====
+  function main() {
+    if (!KOUZA_LIFF_ID) {
+      showCenter('準備中', 'このページは現在準備中です🌿<br>公開まで少々お待ちください。', 'ok');
+      return;
+    }
+    showCenter('読み込み中…', 'そのまま少々お待ちください');
+    liff.init({ liffId: KOUZA_LIFF_ID }).then(function () {
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+      var mode = getQuery('mode') || 'portal';
+      if (mode === 'lead') runLead();
+      else if (mode === 'taiken') runTaiken();
+      else if (mode === 'apply') runApply();
+      else if (mode === 'kadai') runKadai();
+      else runPortal();
+    }).catch(function (err) {
+      showCenter('エラー', 'LINEとの接続に失敗しました。<br>LINEアプリから開き直してください。', 'err');
+    });
+  }
+  main();
+</script>
+</body>
+</html>
