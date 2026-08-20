@@ -206,6 +206,22 @@
     </div>
   </div>
 
+  <!--
+    お名前（2026-08-20 追加）
+    LINEの表示名はニックネームのことが多く、サロンの担当者が来店者と結び付けられない。
+    施術前のカルテとして使うため、ここで本人に入力してもらう。
+  -->
+  <div class="qblock" data-q="full_name" data-required="true">
+    <div class="qhead">
+      <span class="qnum">📝</span>
+      <p class="qtitle">お名前</p>
+    </div>
+    <p class="qhint">サロンでご案内する際に使わせていただきます</p>
+    <input id="fullName" type="text" maxlength="60" placeholder="例：山田 花子"
+      style="width:100%;box-sizing:border-box;padding:13px 14px;font-size:16px;
+             border:1px solid #d8d2c8;border-radius:10px;background:#fff;color:#3b352e;">
+  </div>
+
   <!-- Q1 -->
   <div class="qblock" data-q="q1_skin" data-type="multi" data-required="true">
     <div class="qhead">
@@ -533,11 +549,23 @@
     reader.readAsDataURL(file);
   }
 
+  function getFullName_() {
+    var el = document.getElementById('fullName');
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function setupNameInput() {
+    var el = document.getElementById('fullName');
+    if (!el) return;
+    el.addEventListener('input', updateSubmitBtn);
+  }
+
   function countUnanswered() {
     var n = 0;
     // サロンの確認は店頭QRの診断トークンで自動的に済む（手入力欄は廃止）。
     // トークンが無い＝QR以外から開かれた場合は「未完了」として送信させない。
     if (!getQuery('t')) n++;
+    if (!getFullName_()) n++;
     if (!naviAnswers.q1_skin || naviAnswers.q1_skin.length === 0) n++;
     ['q2_impression', 'q3_mood', 'q4_aroma', 'q5_sleep', 'q6_season', 'q7_botanical', 'q8_experience'].forEach(function (k) {
       if (!naviAnswers[k]) n++;
@@ -615,6 +643,7 @@
 
     var payload = {
       idToken: idToken,
+      fullName: getFullName_(),
       answers: naviAnswers,
       photoBase64: photoBase64,
       photoMime: photoMime,
@@ -681,6 +710,7 @@
     document.getElementById('stageNavi').style.display = 'block';
     document.getElementById('submitBar').style.display = 'block';
     buildOptions();
+    setupNameInput();
     setupPhotoInput();
     setupCodeInput();
     updateSubmitBtn();
