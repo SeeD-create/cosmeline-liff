@@ -649,7 +649,32 @@
     );
   }
 
-  function runNaviFlow() {
+  // 2026-08-20 追加：フォームを出す前に同意状況を確認する。
+  // 8問＋顔写真を入力させてから「未同意なので受け付けません」と弾くのは
+  // お客様の手間を捨てることになるので、開いた時点で判定する。
+  // 通信できなかった場合はフォームを出す（送信時にサーバー側が改めて判定する）。
+  async function runNaviFlow() {
+    try {
+      var idToken = liff.getIDToken();
+      if (idToken) {
+        var url = GAS_ENDPOINT + '?path=navi-precheck&idToken=' + encodeURIComponent(idToken)
+          + '&t=' + encodeURIComponent(getQuery('t') || '');
+        var pre = await fetchJsonp_(url);
+        if (pre && pre.ok && !pre.consented) {
+          showCenter(
+            'まず同意書のご確認を',
+            'ご提案の前に、同意書へのご同意をお願いしております。<br>'
+            + 'LINEのトーク画面に同意のご案内をお送りしました。<br>'
+            + 'ご同意のあと、もう一度QRコードから開いてください🌿',
+            'err'
+          );
+          return;
+        }
+      }
+    } catch (e) {
+      // 事前チェックに失敗してもフォームは出す（送信時のサーバー側ガードで担保）
+    }
+
     document.getElementById('stageCenter').style.display = 'none';
     var mp = document.getElementById('stageMypage');
     if (mp) mp.style.display = 'none';
@@ -817,7 +842,7 @@
       if (!liff.isLoggedIn()) { liff.login(); return; }
 
       if (mode === 'navi') {
-        runNaviFlow();
+        await runNaviFlow();
       } else if (mode === 'mypage') {
         await runMypageFlow();
       } else {

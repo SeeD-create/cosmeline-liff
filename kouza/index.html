@@ -439,6 +439,16 @@
   // ===== ③ 受講申込 =====
   function runApply() {
     show('stageApply');
+
+    // 2026-08-16 追加：?mode=apply&step=pay で、決済方法の選択から再開できるようにする。
+    // 申込は済ませたのに決済を選ばずに離脱した方へ送るリマインドの着地点。
+    // （申込内容はサーバー側に保存済みなので、入力し直してもらう必要がない）
+    if (getQuery('step') === 'pay') {
+      $('applyStep1').style.display = 'none';
+      $('applyStep2').style.display = 'block';
+      $('stepDot2').classList.add('on');
+    }
+
     api_('kouza-consent-texts', {}).then(function (res) {
       if (res && res.ok) {
         $('termsText').textContent = res.texts.terms;
