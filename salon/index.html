@@ -1,0 +1,380 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>サロン管理</title>
+<!--
+  受講生用サロン管理ページ（お客様一覧・カルテ・施術記録・お店の設定・店頭QR）
+
+  2026-08-23：GASが配っていた画面をここへ移設した。
+  理由＝GASのHtmlServiceはページをサンドボックスiframe（googleusercontent.com）の中に
+  入れて配るため、LIFF（LINEログイン）のSDKをその中では動かせない。
+  そこで「画面はGitHub Pages・データは本部GAS」という診断フォームと同じ構成にした。
+
+  入口：診断ナビOA「AI植物診断」のリッチメニュー「マイページ」→「お客様の管理」
+        （マイページ＝ ../index.html?mode=mypage。運用者にだけ入口が出る）
+  認証：マイページがLINEログインのIDトークンを本部GASへ渡し、本部GASが
+        「その人のサロン」を引いて12時間で切れるチケットを発行する。
+        このページはそのチケットだけを持つ（#tk= で受け取り、すぐURLから消す）。
+  画面のHTML/CSSは移設前と同じ。変わったのは通信（google.script.run → JSONP）だけ。
+-->
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;padding:0 0 76px;background:#f7f3ee;color:#5b5048;
+       font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
+       font-size:16px;line-height:1.7;}
+  header{background:#fff;border-bottom:1px solid #e6dccc;padding:14px 18px;position:sticky;top:0;z-index:5;}
+  header .shop{font-size:17px;font-weight:600;margin:0;}
+  header .sub{font-size:12px;color:#9b9088;margin:2px 0 0;}
+  main{padding:16px 16px 0;}
+  .view{display:none;}
+  .view.on{display:block;}
+  .card{background:#fff;border:1px solid #e6dccc;border-radius:12px;padding:14px 16px;margin:0 0 12px;}
+  .card.tap{cursor:pointer;}
+  .card.tap:active{background:#fdfbf8;}
+  .row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .name{font-size:17px;font-weight:600;}
+  .date{font-size:13px;color:#9b9088;white-space:nowrap;}
+  .tags{margin-top:6px;}
+  .tag{display:inline-block;background:#f2ede4;border-radius:20px;
+       padding:2px 12px;font-size:13px;margin:4px 6px 0 0;color:#6b6058;}
+  h2{font-size:14px;font-weight:600;color:#9b8b6e;margin:22px 0 8px;
+     letter-spacing:.04em;}
+  h2:first-child{margin-top:4px;}
+  .kv{display:flex;gap:12px;font-size:15px;padding:7px 0;border-bottom:1px solid #f2ede4;}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{width:7.2em;flex:none;color:#9b9088;font-size:13px;padding-top:3px;}
+  .kv .v{flex:1;}
+  .proposal{white-space:pre-wrap;font-size:15px;}
+  img.photo{width:100%;border-radius:10px;display:block;border:1px solid #e6dccc;}
+  img.qr{width:210px;height:210px;display:block;margin:6px auto 0;
+        border:1px solid #e6dccc;border-radius:10px;background:#fff;}
+  label{display:block;font-size:13px;font-weight:600;margin:16px 0 6px;}
+  input[type=text],input[type=url],input[type=date],textarea{width:100%;padding:12px 13px;
+       border:1px solid #e6dccc;border-radius:9px;font-size:16px;background:#fff;
+       color:#5b5048;font-family:inherit;}
+  textarea{min-height:82px;resize:vertical;}
+  .hint{font-size:12px;color:#9b9088;margin-top:5px;}
+  .picker{border:1px solid #e6dccc;border-radius:9px;background:#fff;padding:8px 10px;
+          max-height:184px;overflow-y:auto;}
+  .picker .opt{display:flex;align-items:center;gap:10px;padding:7px 2px;font-size:15px;
+          border-bottom:1px solid #f5f0e8;}
+  .picker .opt:last-child{border-bottom:none;}
+  .picker input{width:20px;height:20px;flex:none;accent-color:#b89a6e;}
+  button.primary{width:100%;margin-top:20px;padding:15px;border:none;border-radius:10px;
+       background:#b89a6e;color:#fff;font-size:16px;font-weight:600;}
+  button.primary:disabled{background:#cfc3ad;}
+  button.ghost{background:none;border:none;color:#9a7b3e;font-size:15px;padding:6px 0;
+       margin:0 0 6px;font-weight:600;}
+  .msg{display:none;border-radius:9px;padding:11px 13px;font-size:14px;margin-top:14px;}
+  .msg.ok{display:block;background:#f1f6ee;border:1px solid #d6e5cd;color:#5c7d4e;}
+  .msg.ng{display:block;background:#faf2ee;border:1px solid #f2d6cd;color:#c0685e;}
+  .empty{text-align:center;color:#9b9088;font-size:14px;padding:34px 10px;}
+  nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e6dccc;
+      display:flex;padding:6px 0 8px;}
+  nav button{flex:1;background:none;border:none;color:#a99e94;font-size:11px;
+      font-family:inherit;padding:4px 0;line-height:1.5;}
+  nav button .ico{display:block;font-size:21px;line-height:1.2;}
+  nav button.on{color:#b89a6e;font-weight:600;}
+  .loading{text-align:center;color:#9b9088;padding:40px 0;font-size:14px;}
+  .reopen{display:block;margin:18px auto 0;max-width:280px;text-align:center;padding:14px;
+       background:#b89a6e;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;}
+</style></head><body>
+<header>
+  <p class="shop" id="shopName">読み込み中…</p>
+  <p class="sub" id="shopSub"></p>
+</header>
+<main>
+  <div id="boot" class="loading">読み込んでいます…</div>
+  <div class="view" id="v-list">
+    <div id="list"></div>
+  </div>
+  <div class="view" id="v-detail">
+    <button class="ghost" onclick="show('list')">← お客様一覧へ</button>
+    <div id="detail"></div>
+  </div>
+  <div class="view" id="v-settings">
+    <h2>店舗の設定</h2>
+    <div class="card">
+      <label>サロン名</label>
+      <input type="text" id="s-name" placeholder="例：ボタニカルサロン花">
+      <div class="hint">LINEのご案内やシートの名前に使われます。</div>
+      <label>体験予約のURL</label>
+      <input type="url" id="s-booking" placeholder="https://…">
+      <label>販売・講座案内のURL</label>
+      <input type="url" id="s-course" placeholder="https://…">
+      <label>お問い合わせのURL</label>
+      <input type="url" id="s-contact" placeholder="https://…">
+      <div class="hint">お客様のLINEメニューのボタンから、ここで設定したページが開きます。
+           空欄のままだと「準備中」とご案内されます。</div>
+      <button class="primary" id="s-save" onclick="saveSettings()">保存する</button>
+      <div class="msg" id="s-msg"></div>
+    </div>
+  </div>
+  <div class="view" id="v-qr">
+    <h2>店頭にご掲示ください</h2>
+    <div class="card">
+      <div class="name">肌診断のQR</div>
+      <div class="hint">お客様がこれを読み取ると、その場で肌診断が始まります。
+           <b>診断の入口はこのQRだけ</b>です。</div>
+      <img class="qr" id="qr-navi" alt="肌診断QR">
+    </div>
+    <div class="card">
+      <div class="name">LINE友だち追加のQR</div>
+      <div class="hint">お客様をこのサロンの担当として登録します。</div>
+      <img class="qr" id="qr-follow" alt="友だち追加QR">
+    </div>
+  </div>
+</main>
+<nav>
+  <button id="nav-list" class="on" onclick="show('list')"><span class="ico">🗂</span>お客様</button>
+  <button id="nav-settings" onclick="show('settings')"><span class="ico">⚙️</span>設定</button>
+  <button id="nav-qr" onclick="show('qr')"><span class="ico">📱</span>QR</button>
+</nav>
+<script>
+// 設定（デプロイ時に書き換える2つ）
+var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
+var REOPEN_URL = "https://liff.line.me/2010126538-NtCg1KGT?mode=salonadmin";
+
+// チケットは #tk= で受け取り、読んだらすぐURLから消す（履歴に残さない）
+var TICKET = (function () {
+  var m = String(location.hash || "").match(/tk=([^&]+)/);
+  var t = m ? decodeURIComponent(m[1]) : "";
+  if (t && window.history && history.replaceState) {
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  }
+  return t;
+})();
+
+var DATA = null;
+var CUR = null;
+
+// 本部GASのAPIを呼ぶ（JSONP）。LIFFのWebViewでは fetch がCORSに阻まれるため、
+// 診断フォームと同じJSONPに揃えている。20秒で打ち切る。
+function api(fn, params, ok, ng) {
+  var cb = "sa_cb_" + Date.now() + "_" + Math.floor(Math.random() * 100000);
+  var sc = null;
+  var done = false;
+  var timer = setTimeout(function () { finish(); if (ng) ng({ error: "timeout" }); }, 20000);
+
+  function finish() {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    try { delete window[cb]; } catch (e) { window[cb] = undefined; }
+    if (sc && sc.parentNode) sc.parentNode.removeChild(sc);
+  }
+
+  window[cb] = function (res) {
+    finish();
+    if (res && res.code === "expired") { showExpired(res.error); return; }
+    ok(res);
+  };
+
+  var q = ["path=salon-admin-api", "fn=" + encodeURIComponent(fn),
+           "tk=" + encodeURIComponent(TICKET), "callback=" + cb];
+  var p = params || {};
+  Object.keys(p).forEach(function (k) { q.push(k + "=" + encodeURIComponent(p[k])); });
+
+  sc = document.createElement("script");
+  sc.src = GAS_ENDPOINT + "?" + q.join("&");
+  sc.onerror = function () { finish(); if (ng) ng({ error: "network" }); };
+  document.head.appendChild(sc);
+}
+
+// チケットが切れたら、LINEから開き直す1タップだけを出す
+function showExpired(msg) {
+  var main = document.querySelector("main");
+  if (main) {
+    main.innerHTML = "<div class='msg ng'>" + esc(msg || "時間が経ちました。LINEから開き直してください。") + "</div>"
+      + "<a class='reopen' href='" + REOPEN_URL + "'>LINEで開き直す</a>";
+  }
+  var nv = document.querySelector("nav");
+  if (nv) nv.style.display = "none";
+}
+
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+function show(v){
+  ["list","detail","settings","qr"].forEach(function(k){
+    var el=document.getElementById("v-"+k); if(el) el.className = (k===v?"view on":"view");
+    var nb=document.getElementById("nav-"+k); if(nb) nb.className = (k===v?"on":"");
+  });
+  if(v==="detail"){var nb=document.getElementById("nav-list"); if(nb) nb.className="on";}
+  window.scrollTo(0,0);
+}
+
+function boot(){
+  if(!TICKET){fail("このページはLINEのマイページから開いてください。");return;}
+  api("bootstrap", {}, onBoot, function(){
+    fail("読み込みに失敗しました。時間をおいて開き直してください。");
+  });
+}
+
+function fail(m){
+  document.getElementById("boot").innerHTML = "<div class='msg ng'>"+esc(m)+"</div>";
+  document.getElementById("shopName").textContent = "サロン管理";
+}
+
+function onBoot(res){
+  if(!res || !res.ok){fail(res && res.error ? res.error : "読み込めませんでした。");return;}
+  DATA = res;
+  document.getElementById("boot").style.display = "none";
+  document.getElementById("shopName").textContent = res.salon.name || "（サロン名未設定）";
+  document.getElementById("shopSub").textContent = "お客様 " + res.customers.length + "名";
+  document.getElementById("s-name").value = res.salon.name || "";
+  document.getElementById("s-booking").value = res.salon.bookingUrl || "";
+  document.getElementById("s-course").value = res.salon.courseUrl || "";
+  document.getElementById("s-contact").value = res.salon.contactUrl || "";
+  document.getElementById("qr-navi").src = res.salon.naviQr || "";
+  document.getElementById("qr-follow").src = res.salon.followQr || "";
+  renderList();
+  show("list");
+}
+
+function renderList(){
+  var cs = DATA.customers || [];
+  if(!cs.length){
+    document.getElementById("list").innerHTML =
+      "<div class='empty'>まだお客様がいません。<br>店頭のQRから肌診断をご案内ください。</div>";
+    return;
+  }
+  var h = "";
+  cs.forEach(function(c){
+    h += "<div class='card tap' onclick='openCustomer(\""+esc(c.no)+"\")'>"
+      +  "<div class='row'><span class='name'>"+esc(c.name||c.no)+"</span>"
+      +  "<span class='date'>"+(c.lastDiag?("診断 "+esc(c.lastDiag)):"未診断")+"</span></div>"
+      +  "<div class='tags'>"
+      +  (c.skin?"<span class='tag'>"+esc(c.skin)+"</span>":"")
+      +  (c.worry?"<span class='tag'>"+esc(c.worry)+"</span>":"")
+      +  "</div></div>";
+  });
+  document.getElementById("list").innerHTML = h;
+}
+
+function openCustomer(no){
+  document.getElementById("detail").innerHTML = "<div class='loading'>読み込んでいます…</div>";
+  show("detail");
+  api("customer", {no: no}, renderDetail, function(){
+    document.getElementById("detail").innerHTML = "<div class='msg ng'>読み込みに失敗しました。</div>";
+  });
+}
+
+function kv(k,v){return v ? "<div class='kv'><span class='k'>"+k+"</span><span class='v'>"+esc(v)+"</span></div>" : "";}
+
+function renderDetail(res){
+  if(!res || !res.ok){
+    document.getElementById("detail").innerHTML = "<div class='msg ng'>"+esc(res&&res.error||"読み込めませんでした。")+"</div>";
+    return;
+  }
+  CUR = res.customer;
+  var c = res.customer, a = c.answers || {};
+  var h = "<div class='card'><div class='row'><span class='name'>"+esc(c.name||c.no)+"</span>"
+        + "<span class='date'>"+(c.lastDiag?("診断 "+esc(c.lastDiag)):"未診断")+"</span></div></div>";
+
+  if(c.photoUrl){ h += "<h2>お写真</h2><div class='card'><img class='photo' src='"+esc(c.photoUrl)+"' alt='お客様のお写真'></div>"; }
+
+  h += "<h2>ご提案</h2><div class='card'>"+kv("提案原液",c.ingredients)+kv("提案アロマ",c.aromas)
+     + (c.proposal?"<div class='kv'><span class='k'>ご提案文</span><span class='v proposal'>"+esc(c.proposal)+"</span></div>":"")
+     + "</div>";
+
+  h += "<h2>診断のご回答</h2><div class='card'>"
+     + kv("Q1 気になる点",a.q1)+kv("Q2 肌の状態",a.q2)+kv("Q3 今の気分",a.q3)
+     + kv("Q4 好きな香り",a.q4)+kv("Q5 睡眠",a.q5)+kv("Q6 季節の変化",a.q6)
+     + kv("Q7 興味のあるケア",a.q7)+kv("Q8 過ごしたい時間",a.q8)+"</div>";
+
+  h += "<h2>施術の記録</h2>";
+  var ts = res.treatments || [];
+  if(ts.length){
+    h += "<div class='card'>";
+    ts.forEach(function(t){
+      h += "<div class='kv'><span class='k'>"+esc(t.date)+"</span><span class='v'>"
+        + esc([t.ingredients,t.aromas].filter(Boolean).join(" / "))
+        + (t.memo?"<br><span style='color:#9b9088;font-size:13px'>"+esc(t.memo)+"</span>":"")
+        + "</span></div>";
+    });
+    h += "</div>";
+  } else {
+    h += "<div class='card'><div class='hint'>まだ記録がありません。</div></div>";
+  }
+
+  h += "<h2>今日の施術を記録する</h2><div class='card'>"
+     + "<label>施術日</label><input type='date' id='t-date'>"
+     + "<label>使用した原液</label><div class='picker' id='t-ing'></div>"
+     + "<label>使用したアロマ</label><div class='picker' id='t-aroma'></div>"
+     + "<label>メモ</label><textarea id='t-memo' maxlength='500' placeholder='肌の様子、次回に向けての申し送りなど'></textarea>"
+     + "<button class='primary' id='t-save' onclick='saveTreatment()'>この内容で記録する</button>"
+     + "<div class='msg' id='t-msg'></div></div>";
+
+  document.getElementById("detail").innerHTML = h;
+  fillPicker("t-ing", DATA.ingredients||[]);
+  fillPicker("t-aroma", DATA.aromas||[]);
+  var d = new Date();
+  document.getElementById("t-date").value = d.getFullYear()+"-"
+    +("0"+(d.getMonth()+1)).slice(-2)+"-"+("0"+d.getDate()).slice(-2);
+  window.scrollTo(0,0);
+}
+
+function fillPicker(id, names){
+  var el = document.getElementById(id);
+  if(!el) return;
+  if(!names.length){ el.innerHTML = "<div class='hint'>選択肢がまだ登録されていません。</div>"; return; }
+  el.innerHTML = names.map(function(n,i){
+    return "<label class='opt'><input type='checkbox' value='"+esc(n)+"'>"+esc(n)+"</label>";
+  }).join("");
+}
+
+function picked(id){
+  var out = [];
+  var el = document.getElementById(id);
+  if(!el) return "";
+  Array.prototype.forEach.call(el.querySelectorAll("input:checked"), function(i){out.push(i.value);});
+  return out.join("・");
+}
+
+function saveTreatment(){
+  var btn = document.getElementById("t-save");
+  var msg = document.getElementById("t-msg");
+  btn.disabled = true; btn.textContent = "記録しています…"; msg.className = "msg";
+  api("treatment", {
+    no: CUR.no,
+    payload: JSON.stringify({
+      date: document.getElementById("t-date").value,
+      ingredients: picked("t-ing"),
+      aromas: picked("t-aroma"),
+      memo: document.getElementById("t-memo").value
+    })
+  }, function(res){
+    btn.disabled = false; btn.textContent = "この内容で記録する";
+    if(!res || !res.ok){ msg.className="msg ng"; msg.textContent = (res&&res.error)||"記録できませんでした。"; return; }
+    msg.className="msg ok"; msg.textContent = "記録しました。";
+    openCustomer(CUR.no);
+  }, function(){
+    btn.disabled = false; btn.textContent = "この内容で記録する";
+    msg.className="msg ng"; msg.textContent = "通信に失敗しました。もう一度お試しください。";
+  });
+}
+
+function saveSettings(){
+  var btn = document.getElementById("s-save");
+  var msg = document.getElementById("s-msg");
+  btn.disabled = true; btn.textContent = "保存しています…"; msg.className = "msg";
+  api("settings", {
+    payload: JSON.stringify({
+      name: document.getElementById("s-name").value,
+      bookingUrl: document.getElementById("s-booking").value,
+      courseUrl: document.getElementById("s-course").value,
+      contactUrl: document.getElementById("s-contact").value
+    })
+  }, function(res){
+    btn.disabled = false; btn.textContent = "保存する";
+    if(!res || !res.ok){ msg.className="msg ng"; msg.textContent = (res&&res.error)||"保存できませんでした。"; return; }
+    msg.className="msg ok"; msg.textContent = "保存しました。お客様のLINEメニューにすぐ反映されます。";
+    document.getElementById("shopName").textContent = document.getElementById("s-name").value;
+  }, function(){
+    btn.disabled = false; btn.textContent = "保存する";
+    msg.className="msg ng"; msg.textContent = "通信に失敗しました。もう一度お試しください。";
+  });
+}
+
+boot();
+</script></body></html>

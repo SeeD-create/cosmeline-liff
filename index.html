@@ -334,6 +334,15 @@
 
   <div class="profile-card" id="mpProfile"></div>
 
+  <!-- 運用者（サロンを持っている受講生）だけに出る入口。お客様には出ない。
+       メニュー構成・リッチメニュー画像は一切変えず、マイページの中に「足す」形。 -->
+  <div class="redo-cta" id="mpSalonAdmin" style="display:none">
+    <div style="font-weight:600; font-size:14px;">お客様の管理</div>
+    <p>お客様の一覧・カルテ・施術の記録・お店の設定・店頭のQRコード</p>
+    <a id="mpSalonAdminBtn" class="redo-btn" href="#">ひらく</a>
+    <div class="redo-next" id="mpSalonAdminMsg"></div>
+  </div>
+
   <div class="section-head">これまでの植物美容ナビ</div>
   <div id="mpHistory"></div>
 
@@ -376,6 +385,8 @@
   function detectMode() {
     if (getQuery('mode') === 'navi') return 'navi';
     if (getQuery('mode') === 'mypage') return 'mypage';
+    // サロン管理（運用者）へ直行。?salon=Sxxx の「サロン紐づけ」とは別物なので名前を分けている
+    if (getQuery('mode') === 'salonadmin') return 'salonadmin';
     if (getQuery('salon')) return 'salon';
     try {
       if (localStorage.getItem(SALON_STORAGE_KEY)) return 'salon';
@@ -788,6 +799,19 @@
     profileHtml += '<div class="profile-row"><span class="pl">これまでの診断回数</span><span class="pv">' + (p.totalDiagnoses || 0) + ' 回</span></div>';
     document.getElementById('mpProfile').innerHTML = profileHtml;
 
+    // 運用者（サロンを持っている受講生）だけに「お客様の管理」を出す。
+    // 判定は本部側（mypage-data の salonAdmin）＝画面では決めない。
+    var sa = document.getElementById('mpSalonAdmin');
+    if (sa) sa.style.display = data.salonAdmin ? 'block' : 'none';
+    var saBtn = document.getElementById('mpSalonAdminBtn');
+    if (saBtn && !saBtn.getAttribute('data-wired')) {
+      saBtn.setAttribute('data-wired', '1');
+      saBtn.addEventListener('click', function (ev) {
+        ev.preventDefault();
+        openSalonAdmin_();
+      });
+    }
+
     var hist = data.history || [];
     var histEl = document.getElementById('mpHistory');
     if (hist.length === 0) {
@@ -861,6 +885,52 @@
     }
   }
 
+  // ===== サロン管理（運用者向け・画面は salon/index.html） =====
+  //
+  // ここでやるのは「LINEログインのIDトークンを本部GASへ渡し、その人のサロンの
+  // 12時間チケットを受け取って画面へ渡す」だけ。画面側はチケットしか持たない。
+  // 画面を別ページにしている理由：元はGASが配っていたHTMLで、GASのHtmlServiceは
+  // サンドボックスiframeで配るためLIFFのSDKがその中では動かない。
+
+  async function fetchSalonAdminTicket_() {
+    var idToken = liff.getIDToken();
+    if (!idToken) return { ok: false, error: 'ログイン情報を取得できませんでした。' };
+    return await fetchJsonp_(
+      GAS_ENDPOINT + '?path=salon-admin-login&idToken=' + encodeURIComponent(idToken)
+    );
+  }
+
+  async function openSalonAdmin_() {
+    var msg = document.getElementById('mpSalonAdminMsg');
+    if (msg) msg.textContent = 'ひらいています…';
+    try {
+      var res = await fetchSalonAdminTicket_();
+      if (!res || !res.ok) {
+        if (msg) msg.textContent = (res && res.error) || 'ひらけませんでした。時間をおいてお試しください。';
+        return;
+      }
+      window.location.replace('salon/index.html#tk=' + encodeURIComponent(res.ticket));
+    } catch (err) {
+      if (msg) msg.textContent = '通信に失敗しました。もう一度お試しください。';
+    }
+  }
+
+  // ?mode=salonadmin ＝ サロン管理へ直行（チケット切れのとき「LINEで開き直す」で戻る先）
+  async function runSalonAdminFlow() {
+    showCenter('ひらいています…', 'そのまま少々お待ちください', '');
+    try {
+      var res = await fetchSalonAdminTicket_();
+      if (!res || !res.ok) {
+        showCenter('ひらけませんでした',
+          escapeHtml_((res && res.error) || '時間をおいてお試しください。'), 'err');
+        return;
+      }
+      window.location.replace('salon/index.html#tk=' + encodeURIComponent(res.ticket));
+    } catch (err) {
+      showCenter('エラー', '通信に失敗しました。電波の良い場所で開き直してください。', 'err');
+    }
+  }
+
   // ===== エントリーポイント =====
   async function main() {
     var mode = detectMode();
@@ -875,6 +945,8 @@
         await runNaviFlow();
       } else if (mode === 'mypage') {
         await runMypageFlow();
+      } else if (mode === 'salonadmin') {
+        await runSalonAdminFlow();
       } else {
         await runSalonFlow();
       }
