@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>サロン管理</title>
 <!--
-  受講生用サロン管理ページ（お客様一覧・カルテ・施術記録・お店の設定・店頭QR）
+  受講生用サロン管理ページ（お客様一覧・カルテ・カウンセリング記録・お店の設定・店頭QR）
 
   2026-08-23：GASが配っていた画面をここへ移設した。
   理由＝GASのHtmlServiceはページをサンドボックスiframe（googleusercontent.com）の中に
@@ -75,6 +75,13 @@
   nav button .ico{display:block;font-size:21px;line-height:1.2;}
   nav button.on{color:#b89a6e;font-weight:600;}
   .loading{text-align:center;color:#9b9088;padding:40px 0;font-size:14px;}
+  .photos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .photos img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:8px;
+        border:1px solid #e6dccc;display:block;background:#f2ede4;}
+  .photos .cap{font-size:11px;color:#9b9088;text-align:center;margin-top:3px;}
+  #lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.92);
+        display:none;align-items:center;justify-content:center;z-index:50;padding:12px;}
+  #lightbox img{max-width:100%;max-height:100%;border-radius:8px;}
   .reopen{display:block;margin:18px auto 0;max-width:280px;text-align:center;padding:14px;
        background:#b89a6e;color:#fff;border-radius:10px;text-decoration:none;font-weight:600;}
 </style></head><body>
@@ -124,6 +131,7 @@
     </div>
   </div>
 </main>
+<div id="lightbox" onclick="closeLightbox()"><img id="lightboxImg" alt="お客様のお写真"></div>
 <nav>
   <button id="nav-list" class="on" onclick="show('list')"><span class="ico">🗂</span>お客様</button>
   <button id="nav-settings" onclick="show('settings')"><span class="ico">⚙️</span>設定</button>
@@ -259,6 +267,17 @@ function openCustomer(no){
   });
 }
 
+function openPhoto(id){
+  document.getElementById("lightboxImg").src =
+    "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w1200";
+  document.getElementById("lightbox").style.display = "flex";
+}
+
+function closeLightbox(){
+  document.getElementById("lightbox").style.display = "none";
+  document.getElementById("lightboxImg").src = "";
+}
+
 function kv(k,v){return v ? "<div class='kv'><span class='k'>"+k+"</span><span class='v'>"+esc(v)+"</span></div>" : "";}
 
 function renderDetail(res){
@@ -271,9 +290,21 @@ function renderDetail(res){
   var h = "<div class='card'><div class='row'><span class='name'>"+esc(c.name||c.no)+"</span>"
         + "<span class='date'>"+(c.lastDiag?("診断 "+esc(c.lastDiag)):"未診断")+"</span></div></div>";
 
-  if(c.photoUrl){ h += "<h2>お写真</h2><div class='card'><img class='photo' src='"+esc(c.photoUrl)+"' alt='お客様のお写真'></div>"; }
+  var ph = res.photos || [];
+  if(ph.length){
+    var pg = "";
+    ph.forEach(function(p){
+      pg += "<div><img loading='lazy' src='https://drive.google.com/thumbnail?id="+esc(p.id)+"&sz=w200'"
+         +  " alt='お客様のお写真' onclick='openPhoto(\""+esc(p.id)+"\")'>"
+         +  "<div class='cap'>"+esc(p.date)+"</div></div>";
+    });
+    h += "<h2>お写真（新しい順）</h2><div class='card'><div class='photos'>"+pg+"</div>"
+      +  "<div class='hint'>タップすると大きく表示されます。ご自店で承ったぶんだけが並びます。</div></div>";
+  } else if(c.photoUrl){
+    h += "<h2>お写真</h2><div class='card'><img class='photo' src='"+esc(c.photoUrl)+"' alt='お客様のお写真'></div>";
+  }
 
-  h += "<h2>ご提案</h2><div class='card'>"+kv("提案原液",c.ingredients)+kv("提案アロマ",c.aromas)
+  h += "<h2>AIのご提案</h2><div class='card'>"+kv("提案原液",c.ingredients)+kv("提案アロマ",c.aromas)
      + (c.proposal?"<div class='kv'><span class='k'>ご提案文</span><span class='v proposal'>"+esc(c.proposal)+"</span></div>":"")
      + "</div>";
 
@@ -282,7 +313,7 @@ function renderDetail(res){
      + kv("Q4 好きな香り",a.q4)+kv("Q5 睡眠",a.q5)+kv("Q6 季節の変化",a.q6)
      + kv("Q7 興味のあるケア",a.q7)+kv("Q8 過ごしたい時間",a.q8)+"</div>";
 
-  h += "<h2>施術の記録</h2>";
+  h += "<h2>お店のご提案</h2>";
   var ts = res.treatments || [];
   if(ts.length){
     h += "<div class='card'>";
@@ -297,10 +328,10 @@ function renderDetail(res){
     h += "<div class='card'><div class='hint'>まだ記録がありません。</div></div>";
   }
 
-  h += "<h2>今日の施術を記録する</h2><div class='card'>"
-     + "<label>施術日</label><input type='date' id='t-date'>"
-     + "<label>使用した原液</label><div class='picker' id='t-ing'></div>"
-     + "<label>使用したアロマ</label><div class='picker' id='t-aroma'></div>"
+  h += "<h2>今日のカウンセリングを記録する</h2><div class='card'>"
+     + "<label>カウンセリング日</label><input type='date' id='t-date'>"
+     + "<label>ご提案した原液</label><div class='picker' id='t-ing'></div>"
+     + "<label>ご提案したアロマ</label><div class='picker' id='t-aroma'></div>"
      + "<label>メモ</label><textarea id='t-memo' maxlength='500' placeholder='肌の様子、次回に向けての申し送りなど'></textarea>"
      + "<button class='primary' id='t-save' onclick='saveTreatment()'>この内容で記録する</button>"
      + "<div class='msg' id='t-msg'></div></div>";
