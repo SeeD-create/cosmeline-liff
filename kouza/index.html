@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>ボタニカルビューティデザイナー養成講座</title>
+<title>A.I.植物美容デザイナー養成講座</title>
 <!--
   講座LIFF（5画面を ?mode= で切替）
     lead   … リード獲得（氏名・メール・個人情報同意）
@@ -254,7 +254,7 @@
     課題はご提出済みです。スタッフの確認をお待ちください🌿</p>
 </div>
 
-<p class="disclaimer">ボタニカルビューティデザイナー養成講座｜株式会社暇楽</p>
+<p class="disclaimer">A.I.植物美容デザイナー養成講座｜株式会社暇楽</p>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
@@ -447,8 +447,14 @@
       $('stepDot2').classList.add('on');
     }
 
-    api_('kouza-consent-texts', {}).then(function (res) {
+    api_('kouza-consent-texts', { idToken: idToken_() }).then(function (res) {
       if (res && res.ok) {
+        // 受付を開けていないときは入力欄を出さない。
+        // 入力させてから断ると、書いた内容を捨てさせることになるため（2026-08-30）
+        if (res.applyOpen === false) {
+          showCenter('受講のお申し込みは準備中です', res.applyClosedNote || '', 'ok');
+          return;
+        }
         $('termsText').textContent = res.texts.terms;
         $('usageText').textContent = res.texts.usage;
         $('tokushohoText').textContent = res.texts.tokushoho;
