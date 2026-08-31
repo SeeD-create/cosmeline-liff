@@ -513,7 +513,12 @@
       api_('kouza-payment', { idToken: idToken_(), method: checked.value })
         .then(function (res) {
           if (res && res.ok) {
-            showCenter('ありがとうございます', 'お支払いのご案内をLINEのトークにお送りしました🌿<br>ご確認ください。', 'ok');
+            // すでに同じ方法で案内を送っている場合は「送りました」と言わない
+            //（事実と表示を合わせる。2026-08-30）
+            showCenter('ありがとうございます',
+              res.already
+                ? 'お支払いのご案内は、すでにLINEのトークへお送りしています🌿<br>ご確認ください。'
+                : 'お支払いのご案内をLINEのトークにお送りしました🌿<br>ご確認ください。', 'ok');
             closeSoon_();
           } else {
             show('stageApply');
