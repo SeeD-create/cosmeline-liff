@@ -6,12 +6,13 @@
 <meta name="robots" content="noindex, nofollow">
 <title>A.I.植物美容デザイナー養成講座</title>
 <!--
-  講座LIFF（5画面を ?mode= で切替）
+  講座LIFF（基本5画面＋E4状態確認を ?mode= で切替）
     lead   … リード獲得（氏名・メール・個人情報同意）
     taiken … 体験会・相談会の日程選択
     apply  … 受講申込（同意3点 → 同一ページ内で決済選択へ遷移）
     kadai  … 課題提出（写真＋コンサル希望日3つ）
     portal … 受講ポータル（ステータス判定 → Vimeo埋め込み）
+    application-status / assignment-status / diploma … 本人の進捗と修了証
 
   正 = cosmeline-liff/kouza/index.html（GitHub Pages）
   ミラー = cosmeline-demo/liff/kouza/index.html（編集したら両方そろえてdiff一致確認）
@@ -85,6 +86,7 @@
     border: none; border-radius: 999px; cursor: pointer;
   }
   .btn:disabled { opacity: .45; }
+  a.btn { text-align: center; text-decoration: none; }
   .btn.sub { background: none; color: var(--accent-deep); border: 1px solid var(--accent); font-weight: 600; }
 
   .note { font-size: 11.5px; color: var(--mute); margin-top: 10px; }
@@ -254,16 +256,23 @@
     課題はご提出済みです。スタッフの確認をお待ちください🌿</p>
 </div>
 
+<!-- E4メニュー：申込・課題・ディプロマの本人確認済み表示 -->
+<div class="wrap" id="stageStatus" style="display:none">
+  <h1 id="statusTitle"></h1>
+  <div class="card"><p id="statusMessage"></p></div>
+  <a class="btn" id="statusLink" style="display:none" target="_blank" rel="noopener noreferrer">ディプロマを見る</a>
+</div>
+
 <p class="disclaimer">A.I.植物美容デザイナー養成講座｜株式会社暇楽</p>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
   // ▼▼▼ デプロイ時に書き換える設定 ▼▼▼
   var KOUZA_LIFF_ID = "2011080049-arESDw08";   // LINEログインチャネル『BBD講座』（平野さんプロバイダー）のLIFF
-  var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbwnouF8DypkiZo4WpoPAqDczlMPx5MO8EmMLzgruTLNFoubMZBZB_yXFihlzLKJzn5C/exec";
+  var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyrRqzvAKldFIQbldUS65Gsy4oPL7qK325JigiEj8iI9bigHwqq8NwdQOI8cpcTsvAa/exec";
   // ▲▲▲ 設定ここまで ▲▲▲
 
-  var STAGES = ['stageCenter', 'stageLead', 'stageTaiken', 'stageApply', 'stageKadai', 'stagePortal'];
+  var STAGES = ['stageCenter', 'stageLead', 'stageTaiken', 'stageApply', 'stageKadai', 'stagePortal', 'stageStatus'];
 
   // ===== 汎用 =====
   function $(id) { return document.getElementById(id); }
@@ -650,6 +659,53 @@
     });
   }
 
+  // ===== E4メニュー：本人の進捗確認 =====
+  function runStatus(mode) {
+    showCenter('確認中…', 'そのまま少々お待ちください');
+    api_('kouza-member-status', { idToken: idToken_() }).then(function (res) {
+      if (!res || !res.ok) {
+        showCenter('エラー', '情報を確認できませんでした。LINEアプリから開き直してください。', 'err');
+        return;
+      }
+      var status = res.status || '';
+      var title = '';
+      var message = '';
+      var link = $('statusLink');
+      link.style.display = 'none';
+      link.removeAttribute('href');
+      if (mode === 'application-status') {
+        title = 'お申し込み状況';
+        message = status === '受講申込'
+          ? 'お申し込みを受け付けています。お支払いのご案内はLINEのトークをご確認ください。入金確認後、受講を開始できます。'
+          : (status === '受講生' || status === '提出済' || status === '卒業生')
+            ? 'お申し込みと入金確認が完了しています。講座はLINEのメニューからご利用ください。'
+            : '受講のお申し込みはまだ確認できません。';
+      } else if (mode === 'assignment-status') {
+        title = '課題の確認状況';
+        message = status === '提出済'
+          ? '課題を受け付けました。スタッフが確認中です。確認後、LINEでお知らせします。'
+          : status === '卒業生'
+            ? '課題の確認が完了し、卒業生に切り替わっています。'
+            : '課題の提出はまだ確認できません。';
+      } else {
+        title = 'ディプロマ';
+        message = status === '卒業生'
+          ? (res.diplomaUrl ? 'ご卒業おめでとうございます。ディプロマをご覧いただけます。'
+            : 'ディプロマを準備しています。LINEでのご案内をお待ちください。')
+          : 'ディプロマは課題確認後にご案内します。';
+        if (status === '卒業生' && /^https:\/\/drive\.google\.com\/file\/d\//.test(res.diplomaUrl || '')) {
+          link.href = res.diplomaUrl;
+          link.style.display = 'block';
+        }
+      }
+      $('statusTitle').textContent = title;
+      $('statusMessage').textContent = message;
+      show('stageStatus');
+    }).catch(function () {
+      showCenter('エラー', '通信に失敗しました。電波の良い場所でもう一度お試しください。', 'err');
+    });
+  }
+
   // ===== 共通エラー =====
   function errText_(res) {
     var code = res && res.error;
@@ -685,6 +741,7 @@
       else if (mode === 'taiken') runTaiken();
       else if (mode === 'apply') runApply();
       else if (mode === 'kadai') runKadai();
+      else if (mode === 'application-status' || mode === 'assignment-status' || mode === 'diploma') runStatus(mode);
       else runPortal();
     }).catch(function (err) {
       showCenter('エラー', 'LINEとの接続に失敗しました。<br>LINEアプリから開き直してください。', 'err');
