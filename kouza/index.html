@@ -492,7 +492,12 @@
     Object.keys(params || {}).forEach(function (k) {
       url += '&' + k + '=' + encodeURIComponent(params[k]);
     });
-    return fetchJsonp_(url);
+    // Googleに複数アカウントでログイン中でも、匿名公開Webアプリへ届くようにする。
+    return fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('api status ' + response.status);
+        return response.json();
+      }).catch(function () { return fetchJsonp_(url); });
   }
 
   function idToken_() {
@@ -688,6 +693,7 @@
     api_('kouza-consent-texts', {}).then(function (res) {
       if (res && res.ok && res.texts && res.texts.privacy) {
         $('consultPrivacy').textContent = res.texts.privacy;
+        $('consultPrivacy').dataset.source = 'live';
       }
     }).catch(function () {});
 
