@@ -8,7 +8,8 @@
 <!--
   講座LIFF（基本5画面＋E4状態確認を ?mode= で切替）
     lead   … リード獲得（氏名・メール・個人情報同意）
-    taiken … 体験会・相談会の日程選択
+    taiken … 従来の体験会・相談会の日程選択
+    consult … Zoom個別相談の詳細申込
     apply  … 受講申込（同意3点 → 同一ページ内で決済選択へ遷移）
     kadai  … 課題提出（写真＋コンサル希望日3つ）
     portal … 受講ポータル（ステータス判定 → Vimeo埋め込み）
@@ -55,10 +56,18 @@
 
   label.fld { display: block; font-size: 13px; color: var(--accent-deep); margin: 12px 0 4px; font-weight: 600; }
   label.fld .req { color: var(--err); font-size: 11px; margin-left: 6px; }
-  input[type=text], input[type=email], input[type=tel], input[type=date] {
+  input[type=text], input[type=email], input[type=tel], input[type=date], select, textarea {
     width: 100%; padding: 11px 12px; font-size: 16px;
     border: 1px solid var(--line); border-radius: 8px; background: #FDFCFA; color: var(--ink);
   }
+  textarea { min-height: 96px; resize: vertical; font-family: inherit; }
+  .consult-group { border: 0; margin-top: 18px; }
+  .consult-group legend { font-size: 13px; color: var(--accent-deep); font-weight: 600; margin-bottom: 5px; }
+  .consult-group legend .req { color: var(--err); font-size: 11px; margin-left: 6px; }
+  .consult-options { display: grid; gap: 5px; }
+  .consult-options label { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; font-size: 13px; }
+  .consult-options input { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+  .consult-sub { margin-top: 8px; }
   input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
 
   .consent-box {
@@ -174,6 +183,81 @@
   </div>
 </div>
 
+<!-- Zoom個別相談：受講申込・決済とは別の受付 -->
+<div class="wrap" id="stageConsult" style="display:none">
+  <h1>Zoom個別相談会 お申し込み</h1>
+  <p class="lede">講座の内容や学び方、サロンへの導入について、ご希望に合わせてご説明します。気になることも、お気軽にお聞かせください。</p>
+  <form class="card" id="consultForm">
+    <label class="fld" for="consultName">1．お名前<span class="req">必須</span></label>
+    <input id="consultName" type="text" autocomplete="name" maxlength="100" required>
+
+    <label class="fld" for="consultEmail">2．メールアドレス<span class="req">必須</span></label>
+    <input id="consultEmail" type="email" autocomplete="email" maxlength="200" required>
+    <label class="fld" for="consultPhone">電話番号<span class="req">必須</span></label>
+    <input id="consultPhone" type="tel" autocomplete="tel" inputmode="tel" maxlength="30" required>
+    <label class="fld" for="consultPostal">郵便番号<span class="req">必須</span></label>
+    <input id="consultPostal" type="text" autocomplete="postal-code" inputmode="numeric" pattern="[0-9]{3}-?[0-9]{4}" maxlength="8" placeholder="123-4567" required>
+    <label class="fld" for="consultPrefecture">都道府県<span class="req">必須</span></label>
+    <select id="consultPrefecture" autocomplete="address-level1" required><option value="">選択してください</option></select>
+    <label class="fld" for="consultAddress">市区町村・番地<span class="req">必須</span></label>
+    <input id="consultAddress" type="text" autocomplete="street-address" maxlength="250" required>
+    <label class="fld" for="consultBuilding">建物名・部屋番号（任意）</label>
+    <input id="consultBuilding" type="text" maxlength="150">
+
+    <label class="fld" for="consultLineDisplay">3．公式LINEの表示名（任意）</label>
+    <input id="consultLineDisplay" type="text" maxlength="100">
+
+    <fieldset class="consult-group">
+      <legend>4．現在のお仕事・活動について<span class="req">必須</span></legend>
+      <div class="consult-options" id="consultOccupations"></div>
+      <input class="consult-sub" id="consultOccupationOther" type="text" maxlength="250" placeholder="その他の内容（選択した方）">
+      <label class="fld" for="consultBusiness">屋号・サロン名／具体的な活動内容（任意）</label>
+      <input id="consultBusiness" type="text" maxlength="250">
+    </fieldset>
+
+    <fieldset class="consult-group">
+      <legend>5．この講座で実現したいこと<span class="req">必須・複数選択可</span></legend>
+      <div class="consult-options" id="consultGoals"></div>
+      <input class="consult-sub" id="consultGoalsOther" type="text" maxlength="250" placeholder="その他の内容（選択した方）">
+    </fieldset>
+
+    <label class="fld" for="consultConcern">6．現在、困っていることや変えたいこと（任意）</label>
+    <textarea id="consultConcern" maxlength="1000"></textarea>
+
+    <fieldset class="consult-group">
+      <legend>7．受講について、現在のお気持ち<span class="req">必須</span></legend>
+      <div class="consult-options" id="consultIntents"></div>
+    </fieldset>
+
+    <fieldset class="consult-group">
+      <legend>8．相談会で特に確認したいこと<span class="req">必須・複数選択可</span></legend>
+      <div class="consult-options" id="consultQuestions"></div>
+      <input class="consult-sub" id="consultQuestionsOther" type="text" maxlength="250" placeholder="その他の内容（選択した方）">
+    </fieldset>
+
+    <fieldset class="consult-group">
+      <legend>9．相談会のご希望日時<span class="req">必須・複数選択可</span></legend>
+      <p class="note">参加できる曜日・時間帯をお選びください（日本時間）。</p>
+      <div class="consult-options" id="consultTimes"></div>
+      <input class="consult-sub" id="consultTimesOther" type="text" maxlength="250" placeholder="その他の希望日時（選択した方）">
+      <label class="fld" for="consultSpecificDate">具体的な希望日（任意）</label>
+      <input id="consultSpecificDate" type="date">
+    </fieldset>
+
+    <label class="fld" for="consultNote">10．事前に伝えておきたいこと・ご質問（任意）</label>
+    <textarea id="consultNote" maxlength="1000"></textarea>
+
+    <label class="fld">個人情報の取扱い</label>
+    <p class="note">ご入力いただいた情報は、相談会の日程調整、ご連絡及びご希望に合わせた講座説明のために使用します。</p>
+    <details><summary>個人情報の取扱いを確認する</summary><div class="consent-box" id="consultPrivacy">読み込み中…</div></details>
+    <label class="chk"><input id="consultAgree" type="checkbox" required><span>個人情報の取扱いに同意します。【必須】</span></label>
+    <button class="btn" id="consultSubmit" type="submit">Zoom個別相談会に申し込む</button>
+    <div class="alert" id="consultAlert" role="alert"></div>
+    <p class="note">ご希望を確認後、相談日時とZoomの参加URLをご案内します。相談会へのお申し込みだけで、講座の受講契約が成立することはありません。</p>
+  </form>
+  <p class="disclaimer">株式会社暇楽 講座事業部</p>
+</div>
+
 <!-- ③ 受講申込（STEP1 同意 → STEP2 決済選択） -->
 <div class="wrap" id="stageApply" style="display:none">
   <h1>受講のお申し込み</h1>
@@ -272,7 +356,7 @@
   var GAS_ENDPOINT = "https://script.google.com/macros/s/AKfycbyrRqzvAKldFIQbldUS65Gsy4oPL7qK325JigiEj8iI9bigHwqq8NwdQOI8cpcTsvAa/exec";
   // ▲▲▲ 設定ここまで ▲▲▲
 
-  var STAGES = ['stageCenter', 'stageLead', 'stageTaiken', 'stageApply', 'stageKadai', 'stagePortal', 'stageStatus'];
+  var STAGES = ['stageCenter', 'stageLead', 'stageTaiken', 'stageConsult', 'stageApply', 'stageKadai', 'stagePortal', 'stageStatus'];
 
   // ===== 汎用 =====
   function $(id) { return document.getElementById(id); }
@@ -441,6 +525,170 @@
           }
         }).catch(function () { failBack_('stageTaiken', 'taikenSubmit', 'taikenAlert'); });
     });
+  }
+
+  // ===== Zoom個別相談 =====
+  var consultRequestId = '';
+  var CONSULT_OCCUPATIONS = [
+    'サロンを経営している', '美容・健康関連の仕事をしている',
+    '講師・レッスン活動をしている', 'これから開業・活動を始めたい',
+    '自分自身の美容のために学びたい', 'その他'
+  ];
+  var CONSULT_GOALS = [
+    '植物美容や化粧品の知識を深めたい', '自分の肌に合わせたコスメ調合を学びたい',
+    'サロンの新しいメニューに導入したい', 'コスメ調合のレッスンを開催したい',
+    '今の仕事に新たな強みを加えたい', '将来、認定講師として活動したい',
+    'AIを美容の学習や仕事に活用したい', 'その他'
+  ];
+  var CONSULT_INTENTS = [
+    '受講したいので、詳細を確認したい', '興味はあるが、迷っている',
+    '自分に合う講座か相談したい', 'まずは情報を知りたい'
+  ];
+  var CONSULT_QUESTIONS = [
+    '初心者でも学べるか', '講座・教材の具体的な内容',
+    '受講に必要な時間や学び方', 'サロンへの導入方法',
+    'レッスン開催までの進め方', 'AI植物美容ナビの使い方',
+    '修了後の活動・サポート', '受講料・支払方法', 'その他'
+  ];
+  var CONSULT_TIMES = [
+    '火曜日 11:00〜', '火曜日 14:00〜', '金曜日 11:00〜',
+    '金曜日 14:00〜', '土曜日 13:00〜', 'その他'
+  ];
+  var CONSULT_PREFECTURES = [
+    '北海道', '青森県', '岩手県', '宮城県', '秋田県', '山形県', '福島県',
+    '茨城県', '栃木県', '群馬県', '埼玉県', '千葉県', '東京都', '神奈川県',
+    '新潟県', '富山県', '石川県', '福井県', '山梨県', '長野県',
+    '岐阜県', '静岡県', '愛知県', '三重県', '滋賀県', '京都府', '大阪府',
+    '兵庫県', '奈良県', '和歌山県', '鳥取県', '島根県', '岡山県', '広島県',
+    '山口県', '徳島県', '香川県', '愛媛県', '高知県', '福岡県', '佐賀県',
+    '長崎県', '熊本県', '大分県', '宮崎県', '鹿児島県', '沖縄県'
+  ];
+
+  function consultOptions_(containerId, name, values, type) {
+    var root = $(containerId);
+    values.forEach(function (value) {
+      var label = document.createElement('label');
+      var input = document.createElement('input');
+      var span = document.createElement('span');
+      input.type = type;
+      input.name = name;
+      input.value = value;
+      span.textContent = value;
+      label.appendChild(input);
+      label.appendChild(span);
+      root.appendChild(label);
+    });
+  }
+
+  function consultSelected_(name) {
+    return Array.prototype.map.call(
+      document.querySelectorAll('input[name="' + name + '"]:checked'),
+      function (input) { return input.value; }
+    );
+  }
+
+  function consultUuid_() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    bytes[6] = (bytes[6] & 15) | 64;
+    bytes[8] = (bytes[8] & 63) | 128;
+    var hex = Array.prototype.map.call(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-'
+      + hex.slice(16, 20) + '-' + hex.slice(20);
+  }
+
+  function runConsult() {
+    show('stageConsult');
+    CONSULT_PREFECTURES.forEach(function (value) {
+      var option = document.createElement('option');
+      option.value = value;
+      option.textContent = value;
+      $('consultPrefecture').appendChild(option);
+    });
+    consultOptions_('consultOccupations', 'consultOccupation', CONSULT_OCCUPATIONS, 'radio');
+    consultOptions_('consultGoals', 'consultGoal', CONSULT_GOALS, 'checkbox');
+    consultOptions_('consultIntents', 'consultIntent', CONSULT_INTENTS, 'radio');
+    consultOptions_('consultQuestions', 'consultQuestion', CONSULT_QUESTIONS, 'checkbox');
+    consultOptions_('consultTimes', 'consultTime', CONSULT_TIMES, 'checkbox');
+    api_('kouza-consent-texts', {}).then(function (res) {
+      $('consultPrivacy').textContent = res && res.ok && res.texts && res.texts.privacy
+        ? res.texts.privacy : '個人情報の取扱いを読み込めませんでした。時間をおいて開き直してください。';
+    }).catch(function () {
+      $('consultPrivacy').textContent = '個人情報の取扱いを読み込めませんでした。時間をおいて開き直してください。';
+    });
+
+    $('consultForm').addEventListener('submit', function (event) {
+      event.preventDefault();
+      setAlert('consultAlert', '');
+      var occupation = consultSelected_('consultOccupation')[0] || '';
+      var goals = consultSelected_('consultGoal');
+      var intent = consultSelected_('consultIntent')[0] || '';
+      var questions = consultSelected_('consultQuestion');
+      var times = consultSelected_('consultTime');
+      if (!occupation || !goals.length || !intent || !questions.length || !times.length ||
+          (occupation === 'その他' && !$('consultOccupationOther').value.trim()) ||
+          (goals.indexOf('その他') >= 0 && !$('consultGoalsOther').value.trim()) ||
+          (questions.indexOf('その他') >= 0 && !$('consultQuestionsOther').value.trim()) ||
+          (times.indexOf('その他') >= 0 && !$('consultTimesOther').value.trim())) {
+        setAlert('consultAlert', '必須の選択項目と「その他」の内容をご確認ください。');
+        $('consultAlert').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      if ($('consultPrivacy').textContent === '読み込み中…' ||
+          $('consultPrivacy').textContent.indexOf('読み込めませんでした') >= 0) {
+        setAlert('consultAlert', '個人情報の取扱いを読み込めませんでした。開き直してください。');
+        return;
+      }
+      if (!idToken_()) {
+        setAlert('consultAlert', 'LINEとの接続を確認できません。LINEアプリから開き直してください。');
+        return;
+      }
+      if (!consultRequestId) consultRequestId = consultUuid_();
+      var payload = {
+        idToken: idToken_(), requestId: consultRequestId,
+        name: $('consultName').value.trim(), email: $('consultEmail').value.trim(),
+        phone: $('consultPhone').value.trim(), postal: $('consultPostal').value.trim(),
+        prefecture: $('consultPrefecture').value, address: $('consultAddress').value.trim(),
+        building: $('consultBuilding').value.trim(), lineDisplay: $('consultLineDisplay').value.trim(),
+        occupation: occupation, occupationOther: $('consultOccupationOther').value.trim(),
+        business: $('consultBusiness').value.trim(), goals: goals,
+        goalsOther: $('consultGoalsOther').value.trim(), concern: $('consultConcern').value.trim(),
+        intent: intent, questions: questions, questionsOther: $('consultQuestionsOther').value.trim(),
+        times: times, timesOther: $('consultTimesOther').value.trim(),
+        specificDate: $('consultSpecificDate').value, note: $('consultNote').value.trim(), agree: true
+      };
+      $('consultSubmit').disabled = true;
+      showCenter('送信中…', '受付を確認しています。そのまま少々お待ちください');
+      fetch(GAS_ENDPOINT + '?ch=kouza&path=kouza-consult', {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify(payload)
+      }).then(function () { pollKouzaConsult_(0); })
+        .catch(function () { pollKouzaConsult_(0); });
+    });
+  }
+
+  function pollKouzaConsult_(attempt) {
+    api_('kouza-consult-status', { requestId: consultRequestId }).then(function (res) {
+      if (res && res.ok && res.received) {
+        consultRequestId = '';
+        showCenter('お申し込みを受け付けました',
+          'ご希望を確認後、相談日時とZoomの参加URLをご案内します。', 'ok');
+        return;
+      }
+      if (attempt >= 19) return consultFailed_();
+      setTimeout(function () { pollKouzaConsult_(attempt + 1); }, 1500);
+    }).catch(function () {
+      if (attempt >= 19) return consultFailed_();
+      setTimeout(function () { pollKouzaConsult_(attempt + 1); }, 1500);
+    });
+  }
+
+  function consultFailed_() {
+    show('stageConsult');
+    $('consultSubmit').disabled = false;
+    setAlert('consultAlert', '受付を確認できませんでした。通信状態を確認して、もう一度押してください。');
   }
 
   // ===== ③ 受講申込 =====
@@ -739,6 +987,7 @@
       var mode = getQuery('mode') || 'portal';
       if (mode === 'lead') runLead();
       else if (mode === 'taiken') runTaiken();
+      else if (mode === 'consult') runConsult();
       else if (mode === 'apply') runApply();
       else if (mode === 'kadai') runKadai();
       else if (mode === 'application-status' || mode === 'assignment-status' || mode === 'diploma') runStatus(mode);
