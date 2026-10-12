@@ -511,13 +511,16 @@
   }
 
   // ===== ① リード獲得 =====
+  var leadRequestId = '';
   function runLead() {
     show('stageLead');
+    $('privacyText').textContent = $('consultPrivacy').textContent;
     api_('kouza-consent-texts', {}).then(function (res) {
       if (res && res.ok) $('privacyText').textContent = res.texts.privacy;
     }).catch(function () {});
 
     function update() {
+      leadRequestId = '';
       $('leadSubmit').disabled = !(
         $('leadName').value.trim() && $('leadEmail').value.trim() && $('leadAgree').checked
       );
@@ -527,24 +530,48 @@
 
     $('leadSubmit').addEventListener('click', function () {
       setAlert('leadAlert', '');
+      if (!idToken_()) {
+        setAlert('leadAlert', 'LINEとの接続を確認できません。LINEアプリから開き直してください。');
+        return;
+      }
+      if (!leadRequestId) leadRequestId = consultUuid_();
       $('leadSubmit').disabled = true;
       showCenter('送信中…', 'そのまま少々お待ちください');
-      api_('kouza-lead', {
+      fetch(GAS_ENDPOINT + '?ch=kouza&path=kouza-lead', {
+        method: 'POST', mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: JSON.stringify({
         idToken: idToken_(),
+        requestId: leadRequestId,
         name: $('leadName').value.trim(),
         email: $('leadEmail').value.trim(),
-        agree: '1',
-      }).then(function (res) {
-        if (res && res.ok) {
-          showCenter('登録ありがとうございます', 'LINEのトークにご案内をお送りしました🌿', 'ok');
-          closeSoon_();
-        } else {
-          show('stageLead');
-          $('leadSubmit').disabled = false;
-          setAlert('leadAlert', errText_(res));
-        }
-      }).catch(function () { failBack_('stageLead', 'leadSubmit', 'leadAlert'); });
+        agree: true
+        })
+      }).then(function () { pollKouzaLead_(0); })
+        .catch(function () { pollKouzaLead_(0); });
     });
+  }
+
+  function pollKouzaLead_(attempt) {
+    api_('kouza-lead-status', { requestId: leadRequestId }).then(function (res) {
+      if (res && res.ok && res.received) {
+        leadRequestId = '';
+        showCenter('登録ありがとうございます', '講座のご案内をこのLINEでお届けします🌿', 'ok');
+        closeSoon_();
+        return;
+      }
+      if (attempt >= 19) return leadFailed_();
+      setTimeout(function () { pollKouzaLead_(attempt + 1); }, 1500);
+    }).catch(function () {
+      if (attempt >= 19) return leadFailed_();
+      setTimeout(function () { pollKouzaLead_(attempt + 1); }, 1500);
+    });
+  }
+
+  function leadFailed_() {
+    show('stageLead');
+    $('leadSubmit').disabled = false;
+    setAlert('leadAlert', '受付を確認できませんでした。同じ画面からもう一度押してください。');
   }
 
   // ===== ② 体験会・相談会 =====
