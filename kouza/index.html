@@ -488,16 +488,54 @@
   }
 
   function api_(path, params) {
+    if (params && params.idToken) return secureApi_(path, params);
     var url = GAS_ENDPOINT + '?ch=kouza&path=' + path;
     Object.keys(params || {}).forEach(function (k) {
       url += '&' + k + '=' + encodeURIComponent(params[k]);
     });
+    // A one-time result must not be consumed by a CORS request before JSONP fallback.
+    if (path === 'kouza-result') return fetchJsonp_(url);
     // Googleに複数アカウントでログイン中でも、匿名公開Webアプリへ届くようにする。
     return fetch(url, { method: 'GET', mode: 'cors', credentials: 'omit' })
       .then(function (response) {
         if (!response.ok) throw new Error('api status ' + response.status);
         return response.json();
       }).catch(function () { return fetchJsonp_(url); });
+  }
+
+  function secureApi_(route, params) {
+    var requestId = params.requestId || consultUuid_();
+    var payload = Object.assign({},params,{route:route,requestId:requestId});
+    return fetch(GAS_ENDPOINT+'?ch=kouza&path=kouza-secure',{
+      method:'POST',mode:'no-cors',credentials:'omit',
+      headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(payload)
+    }).then(function(){
+      var tries=0;
+      function poll(){
+        return api_('kouza-result',{requestId:requestId}).then(function(res){
+          if(!res.ok) throw new Error(res.error || '受付確認に失敗しました');
+          if(!res.pending) return res.result;
+          if(++tries>=80) throw new Error('受付を確認できません。再度お試しください。');
+          return new Promise(function(resolve){setTimeout(resolve,1500);}).then(poll);
+        });
+      }
+      return poll();
+    });
+  }
+
+  function runDocument() {
+    showCenter('書類を確認しています','本人確認後に書類を表示します。');
+    secureApi_('kouza-document',{idToken:idToken_(),kind:getQuery('kind')}).then(function(res){
+      if(!res.ok) throw new Error(res.error);
+      var raw=atob(res.base64), bytes=new Uint8Array(raw.length);
+      for(var i=0;i<raw.length;i++) bytes[i]=raw.charCodeAt(i);
+      var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+      showCenter('書類の準備ができました','下のリンクからご確認ください。');
+      var link=document.createElement('a'); link.href=url; link.textContent='書類を開く';
+      link.target='_blank'; link.rel='noopener'; link.className='btn';
+      document.body.appendChild(link);
+      window.addEventListener('pagehide',function(){URL.revokeObjectURL(url);},{once:true});
+    }).catch(function(){showCenter('書類を表示できません','時間をおいて開き直すか、スタッフへお問い合わせください。');});
   }
 
   function idToken_() {
@@ -512,17 +550,18 @@
 
   // ===== ① リード獲得 =====
   var leadRequestId = '';
+  var leadConsentVersion='',leadConsentHash='',consultConsentVersion='',consultConsentHash='';
   function runLead() {
     show('stageLead');
-    $('privacyText').textContent = $('consultPrivacy').textContent;
+    $('privacyText').textContent = '読み込み中…';
     api_('kouza-consent-texts', {}).then(function (res) {
-      if (res && res.ok) $('privacyText').textContent = res.texts.privacy;
+      if (res && res.ok) { $('privacyText').textContent = res.texts.privacy; leadConsentVersion=res.version;leadConsentHash=res.privacyHash;update(); }
     }).catch(function () {});
 
     function update() {
       leadRequestId = '';
       $('leadSubmit').disabled = !(
-        $('leadName').value.trim() && $('leadEmail').value.trim() && $('leadAgree').checked
+        leadConsentVersion && leadConsentHash && $('leadName').value.trim() && $('leadEmail').value.trim() && $('leadAgree').checked
       );
     }
     ['leadName', 'leadEmail'].forEach(function (id) { $(id).addEventListener('input', update); });
@@ -541,7 +580,7 @@
         method: 'POST', mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: JSON.stringify({
-        idToken: idToken_(),
+        idToken: idToken_(), consentVersion:leadConsentVersion,consentHash:leadConsentHash,
         requestId: leadRequestId,
         name: $('leadName').value.trim(),
         email: $('leadEmail').value.trim(),
@@ -717,9 +756,11 @@
     consultOptions_('consultIntents', 'consultIntent', CONSULT_INTENTS, 'radio');
     consultOptions_('consultQuestions', 'consultQuestion', CONSULT_QUESTIONS, 'checkbox');
     consultOptions_('consultTimes', 'consultTime', CONSULT_TIMES, 'checkbox');
+    $('consultPrivacy').textContent='読み込み中…';
     api_('kouza-consent-texts', {}).then(function (res) {
       if (res && res.ok && res.texts && res.texts.privacy) {
-        $('consultPrivacy').textContent = res.texts.privacy;
+        $('consultPrivacy').textContent = res.consultPrivacy;
+        consultConsentVersion=res.consultVersion;consultConsentHash=res.consultPrivacyHash;
         $('consultPrivacy').dataset.source = 'live';
       }
     }).catch(function () {});
@@ -752,7 +793,7 @@
       }
       if (!consultRequestId) consultRequestId = consultUuid_();
       var payload = {
-        idToken: idToken_(), requestId: consultRequestId,
+        idToken: idToken_(), requestId: consultRequestId,consentVersion:consultConsentVersion,consentHash:consultConsentHash,
         name: $('consultName').value.trim(), email: $('consultEmail').value.trim(),
         phone: $('consultPhone').value.trim(), postal: $('consultPostal').value.trim(),
         prefecture: $('consultPrefecture').value, address: $('consultAddress').value.trim(),
@@ -919,24 +960,18 @@
       setAlert('kadaiAlert', '');
       $('kadaiSubmit').disabled = true;
       showCenter('送信中…', '写真をお送りしています。そのまま少々お待ちください');
-      // 写真つきのため POST（no-cors＝結果は取れない。受付結果はLINEのpushで届く）
-      fetch(GAS_ENDPOINT + '?ch=kouza&path=kouza-kadai', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-        body: JSON.stringify({
-          idToken: idToken_(),
-          photoBase64: kadaiPhotoBase64,
-          photoMime: kadaiPhotoMime,
-          date1: $('kadaiDate1').value,
-          date2: $('kadaiDate2').value,
-          date3: $('kadaiDate3').value,
-        }),
-      });
-      setTimeout(function () {
-        showCenter('提出を送信しました', 'LINEのトークに受付のメッセージが届いたら完了です🌿<br>（届かない場合はもう一度お試しください）', 'ok');
+      if (!window.kadaiRequestId) window.kadaiRequestId = consultUuid_();
+      secureApi_('kouza-kadai', {
+        idToken:idToken_(), requestId:window.kadaiRequestId,
+        photoBase64:kadaiPhotoBase64, photoMime:kadaiPhotoMime,
+        date1:$('kadaiDate1').value,date2:$('kadaiDate2').value,date3:$('kadaiDate3').value
+      }).then(function(res){
+        if(!res.ok) throw new Error(res.error || '受付できませんでした');
+        showCenter('提出を受け付けました','課題の保存が完了しました。スタッフが確認します。','ok');
         closeSoon_();
-      }, 1800);
+      }).catch(function(err){
+        showCenter('受付を確認できませんでした','画面を開き直して再度お試しください。');
+      });
     });
   }
 
@@ -1044,11 +1079,11 @@
       } else {
         title = 'ディプロマ';
         message = status === '卒業生'
-          ? (res.diplomaUrl ? 'ご卒業おめでとうございます。ディプロマをご覧いただけます。'
+          ? (res.hasDiploma ? 'ご卒業おめでとうございます。ディプロマをご覧いただけます。'
             : 'ディプロマを準備しています。LINEでのご案内をお待ちください。')
           : 'ディプロマは課題確認後にご案内します。';
-        if (status === '卒業生' && /^https:\/\/drive\.google\.com\/file\/d\//.test(res.diplomaUrl || '')) {
-          link.href = res.diplomaUrl;
+        if (status === '卒業生' && res.hasDiploma === true) {
+          link.href = 'https://liff.line.me/' + KOUZA_LIFF_ID + '?mode=document&kind=diploma';
           link.style.display = 'block';
         }
       }
@@ -1096,6 +1131,7 @@
       else if (mode === 'consult') runConsult();
       else if (mode === 'apply') runApply();
       else if (mode === 'kadai') runKadai();
+      else if (mode === 'document') runDocument();
       else if (mode === 'application-status' || mode === 'assignment-status' || mode === 'diploma') runStatus(mode);
       else runPortal();
     }).catch(function (err) {
