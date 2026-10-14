@@ -767,7 +767,7 @@
     consultOptions_('consultTimes', 'consultTime', CONSULT_TIMES, 'checkbox');
     $('consultPrivacy').textContent='読み込み中…';
     api_('kouza-consent-texts', {}).then(function (res) {
-      if (res && res.ok && res.texts && res.texts.privacy) {
+      if (res && res.ok && res.consultPrivacy && res.consultVersion && res.consultPrivacyHash) {
         $('consultPrivacy').textContent = res.consultPrivacy;
         consultConsentVersion=res.consultVersion;consultConsentHash=res.consultPrivacyHash;
         $('consultPrivacy').dataset.source = 'live';
@@ -791,7 +791,7 @@
         $('consultAlert').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
-      if ($('consultPrivacy').textContent === '読み込み中…' ||
+      if (!consultConsentVersion || !consultConsentHash || $('consultPrivacy').textContent === '読み込み中…' ||
           $('consultPrivacy').textContent.indexOf('読み込めませんでした') >= 0) {
         setAlert('consultAlert', '個人情報の取扱いを読み込めませんでした。開き直してください。');
         return;
@@ -866,6 +866,7 @@
       $('stepDot2').classList.remove('on');
       window.scrollTo(0,0);
     };
+    if (getQuery('step') === 'pay') $('applySubmit').onclick();
   }
 
   // ===== ④ 課題提出 =====
