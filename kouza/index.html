@@ -515,9 +515,12 @@
   function secureApi_(route, params) {
     var requestId = params.requestId || consultUuid_();
     var payload = Object.assign({},params,{route:route,requestId:requestId});
+    var body=JSON.stringify(payload);
+    if(!/^[a-f0-9-]{36}$/i.test(requestId)) return Promise.reject(new Error('受付IDを確認できません。画面を開き直してください。'));
+    if(body.length>5800000) return Promise.reject(new Error('ファイルが大きすぎます。小さい画像で再度お試しください。'));
     return fetch(GAS_ENDPOINT+'?ch=kouza&path=kouza-secure',{
       method:'POST',mode:'no-cors',credentials:'omit',
-      headers:{'Content-Type':'text/plain;charset=UTF-8'},body:JSON.stringify(payload)
+      headers:{'Content-Type':'text/plain;charset=UTF-8'},body:body
     }).then(function(){
       var tries=0;
       function poll(){
