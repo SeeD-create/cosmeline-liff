@@ -332,50 +332,59 @@
   <p class="disclaimer">株式会社暇楽 講座事業部</p>
 </div>
 
-<!-- ③ 受講申込（STEP1 同意 → STEP2 決済選択） -->
+<!-- ③ 受講申込：確認用の仮画面。正式受付はサーバー側も閉鎖中。 -->
 <div class="wrap" id="stageApply" style="display:none">
   <h1>受講のお申し込み</h1>
+  <div class="card" role="note" style="border:1px solid #c3aa80;background:#fffaf0">
+    <strong>現在は準備中・確認用の仮画面です</strong>
+    <p>規約の確認と決済の接続を進めています。この画面では申込・契約・お支払いは成立しません。入力内容は送信・保存されません。</p>
+  </div>
   <div class="steps"><i id="stepDot1" class="on"></i><i id="stepDot2"></i></div>
-
   <div id="applyStep1">
-    <p class="lede">お客様情報のご入力と、規約へのご同意をお願いします</p>
+    <p class="lede">A.I.植物美容デザイナー養成講座</p>
     <div class="card">
-      <h2>お客様情報</h2>
-      <label class="fld">お名前<span class="req">必須</span></label>
-      <input type="text" id="applyName" placeholder="例）山田 花子" autocomplete="name">
-      <label class="fld">ご住所<span class="req">必須</span></label>
-      <input type="text" id="applyAddress" placeholder="例）福岡県福岡市中央区平尾1-2-3" autocomplete="street-address">
-      <label class="fld">お電話番号<span class="req">必須</span></label>
-      <input type="tel" id="applyPhone" placeholder="例）09012345678" autocomplete="tel" inputmode="tel">
+      <h2>お客様情報（入力イメージ）</h2>
+      <p class="note">動作確認には架空の内容をお使いください。未入力のまま次へ進めます。</p>
+      <label class="fld" for="applyName">お名前</label>
+      <input type="text" id="applyName" placeholder="例）山田 花子" autocomplete="off">
+      <label class="fld" for="applyEmail">メールアドレス</label>
+      <input type="email" id="applyEmail" placeholder="例）sample@example.com" autocomplete="off">
+      <label class="fld" for="applyAddress">ご住所</label>
+      <input type="text" id="applyAddress" placeholder="教材のお届け先" autocomplete="off">
+      <label class="fld" for="applyPhone">お電話番号</label>
+      <input type="tel" id="applyPhone" placeholder="連絡先電話番号" autocomplete="off">
     </div>
     <div class="card">
-      <h2>受講規約</h2>
-      <div class="consent-box" id="termsText">読み込み中…</div>
-      <label class="chk"><input type="checkbox" id="agreeTerms"><span>受講規約に同意します</span></label>
-      <h2>利用規約</h2>
-      <div class="consent-box" id="usageText">読み込み中…</div>
-      <label class="chk"><input type="checkbox" id="agreeUsage"><span>利用規約に同意します</span></label>
-      <h2>特定商取引法に基づく表記</h2>
-      <div class="consent-box" id="tokushohoText">読み込み中…</div>
-      <label class="chk"><input type="checkbox" id="agreeTokushoho"><span>特定商取引法に基づく表記を確認しました</span></label>
-      <button class="btn" id="applySubmit" disabled>同意して申し込む</button>
-      <p class="note">ご同意いただいた内容の控えは、LINEのトークにPDFでお送りします。</p>
-      <div class="alert" id="applyAlert"></div>
+      <h2>利用規約（サンプル・未確定）</h2>
+      <p class="note">ご提供の規約案の項目をもとにした画面確認用の概要です。正式な規約本文ではありません。</p>
+      <div class="consent-box" id="termsText">1．講座の内容
+植物美容の知識、教材を使った実習、AI植物美容ナビの利用等について学ぶ講座です。提供内容・期間は正式な案内で確定します。
+
+2．受講料・支払い
+受講料、支払方法、支払期限は確認中です。現在は決済できません。
+
+3．解約・返金
+解約・返金の条件は、ご提供の規約案を確認のうえ正式版に記載します。
+
+4．教材とサービスの利用
+教材・動画・AIサービスの利用範囲、著作権、禁止事項等は正式版に記載します。
+
+5．個人情報・契約の成立
+個人情報の取扱い、契約が成立する時点、同意内容の控えの交付方法は正式版でご案内します。この仮画面では契約は成立しません。</div>
+      <label class="chk"><input type="checkbox" id="agreeTerms"><span>サンプル表示を確認しました（正式な同意ではありません）</span></label>
+      <details><summary>特定商取引法に基づく表記（準備中）</summary><p class="note">販売条件・支払時期・提供時期・解約条件等を確認中です。正式な表示を用意してから受付を開始します。</p></details>
+      <button class="btn" id="applySubmit" type="button">お支払い画面を確認する（仮）</button>
+      <p class="note">この操作では申し込みを送信しません。</p>
     </div>
   </div>
-
   <div id="applyStep2" style="display:none">
-    <p class="lede">お申し込みを受け付けました。<br>お支払い方法をお選びください</p>
+    <p class="lede">お支払い（準備中）</p>
     <div class="card">
-      <div class="opt-list">
-        <label class="opt"><input type="radio" name="payMethod" value="univapay">
-          <span>クレジットカード決済（分割払い可）<small>UnivaPayの決済ページをご案内します</small></span></label>
-        <label class="opt"><input type="radio" name="payMethod" value="bank">
-          <span>銀行振込（前払い）<small>振込先をLINEでご案内します ※振込手数料はご負担ください</small></span></label>
-      </div>
-      <button class="btn" id="paySubmit" disabled>この方法で進める</button>
-      <p class="note">ご入金の確認は営業日ベースで行っております。確認でき次第、講座の視聴開始をLINEでお知らせします。</p>
-      <div class="alert" id="payAlert"></div>
+      <h2>クレジットカード決済</h2>
+      <p>Stripeの接続を準備しています。現在は決済できません。</p>
+      <button class="btn" id="paySubmit" type="button" disabled>Stripe決済 — 未接続です</button>
+      <p class="note">申込の受付・お支払い・受講生への切替は行われていません。</p>
+      <button class="btn" id="applyBack" type="button">入力画面に戻る</button>
     </div>
   </div>
 </div>
@@ -839,98 +848,24 @@
   }
 
   // ===== ③ 受講申込 =====
+  // Preview only: no submission, consent record, payment, or member changes.
   function runApply() {
     show('stageApply');
-
-    // 2026-08-16 追加：?mode=apply&step=pay で、決済方法の選択から再開できるようにする。
-    // 申込は済ませたのに決済を選ばずに離脱した方へ送るリマインドの着地点。
-    // （申込内容はサーバー側に保存済みなので、入力し直してもらう必要がない）
-    if (getQuery('step') === 'pay') {
+    $('applyStep1').style.display = 'block';
+    $('applyStep2').style.display = 'none';
+    $('applySubmit').disabled = false;
+    $('applySubmit').onclick = function () {
       $('applyStep1').style.display = 'none';
       $('applyStep2').style.display = 'block';
       $('stepDot2').classList.add('on');
-    }
-
-    api_('kouza-consent-texts', { idToken: idToken_() }).then(function (res) {
-      if (res && res.ok) {
-        // 受付を開けていないときは入力欄を出さない。
-        // 入力させてから断ると、書いた内容を捨てさせることになるため（2026-08-30）
-        if (res.applyOpen === false) {
-          showCenter('受講のお申し込みは準備中です', res.applyClosedNote || '', 'ok');
-          return;
-        }
-        $('termsText').textContent = res.texts.terms;
-        $('usageText').textContent = res.texts.usage;
-        $('tokushohoText').textContent = res.texts.tokushoho;
-      }
-    }).catch(function () {});
-
-    function update() {
-      $('applySubmit').disabled = !(
-        $('applyName').value.trim() && $('applyAddress').value.trim() && $('applyPhone').value.trim()
-        && $('agreeTerms').checked && $('agreeUsage').checked && $('agreeTokushoho').checked
-      );
-    }
-    ['applyName', 'applyAddress', 'applyPhone'].forEach(function (id) { $(id).addEventListener('input', update); });
-    ['agreeTerms', 'agreeUsage', 'agreeTokushoho'].forEach(function (id) { $(id).addEventListener('change', update); });
-
-    $('applySubmit').addEventListener('click', function () {
-      setAlert('applyAlert', '');
-      $('applySubmit').disabled = true;
-      showCenter('送信中…', 'そのまま少々お待ちください');
-      api_('kouza-apply', {
-        idToken: idToken_(),
-        name: $('applyName').value.trim(),
-        address: $('applyAddress').value.trim(),
-        phone: $('applyPhone').value.trim(),
-        agreeTerms: '1', agreeUsage: '1', agreeTokushoho: '1',
-      }).then(function (res) {
-        if (res && res.ok) {
-          // 同じLIFF内で決済選択へ遷移（設計どおり）
-          show('stageApply');
-          $('applyStep1').style.display = 'none';
-          $('applyStep2').style.display = 'block';
-          $('stepDot2').classList.add('on');
-          window.scrollTo(0, 0);
-        } else {
-          show('stageApply');
-          $('applySubmit').disabled = false;
-          setAlert('applyAlert', errText_(res));
-        }
-      }).catch(function () { failBack_('stageApply', 'applySubmit', 'applyAlert'); });
-    });
-
-    document.querySelectorAll('input[name=payMethod]').forEach(function (input) {
-      input.addEventListener('change', function () {
-        document.querySelectorAll('#applyStep2 .opt').forEach(function (el) { el.classList.remove('sel'); });
-        input.closest('.opt').classList.add('sel');
-        $('paySubmit').disabled = false;
-      });
-    });
-
-    $('paySubmit').addEventListener('click', function () {
-      var checked = document.querySelector('input[name=payMethod]:checked');
-      if (!checked) return;
-      setAlert('payAlert', '');
-      $('paySubmit').disabled = true;
-      showCenter('送信中…', 'そのまま少々お待ちください');
-      api_('kouza-payment', { idToken: idToken_(), method: checked.value })
-        .then(function (res) {
-          if (res && res.ok) {
-            // すでに同じ方法で案内を送っている場合は「送りました」と言わない
-            //（事実と表示を合わせる。2026-08-30）
-            showCenter('ありがとうございます',
-              res.already
-                ? 'お支払いのご案内は、すでにLINEのトークへお送りしています🌿<br>ご確認ください。'
-                : 'お支払いのご案内をLINEのトークにお送りしました🌿<br>ご確認ください。', 'ok');
-            closeSoon_();
-          } else {
-            show('stageApply');
-            $('paySubmit').disabled = false;
-            setAlert('payAlert', errText_(res));
-          }
-        }).catch(function () { failBack_('stageApply', 'paySubmit', 'payAlert'); });
-    });
+      window.scrollTo(0,0);
+    };
+    $('applyBack').onclick = function () {
+      $('applyStep1').style.display = 'block';
+      $('applyStep2').style.display = 'none';
+      $('stepDot2').classList.remove('on');
+      window.scrollTo(0,0);
+    };
   }
 
   // ===== ④ 課題提出 =====
@@ -1115,6 +1050,7 @@
 
   // ===== 起動 =====
   function main() {
+    if (getQuery('mode') === 'apply') { runApply(); return; }
     if (!KOUZA_LIFF_ID) {
       showCenter('準備中', 'このページは現在準備中です🌿<br>公開まで少々お待ちください。', 'ok');
       return;
